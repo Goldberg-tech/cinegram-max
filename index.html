@@ -1,8 +1,8 @@
 <!DOCTYPE html>
-<html>
+<html lang="ru">
 <head>
 <meta charset="UTF-8">
-<title>TelePub</title>
+<title>Кинотеатр</title>
 
 <script src="https://cdn.jsdelivr.net/npm/video.js@7/dist/video.min.js"></script>
 <link href="https://cdn.jsdelivr.net/npm/video.js@7/dist/video-js.min.css" rel="stylesheet">
@@ -10,42 +10,68 @@
 <style>
 
 body{
-margin:0;
-background:#0b0b0b;
-font-family:Arial;
+background:#0f0f0f;
 color:white;
-}
-
-.grid{
-display:grid;
-grid-template-columns:repeat(auto-fill,minmax(160px,1fr));
-gap:20px;
+font-family:Arial;
+margin:0;
 padding:20px;
 }
 
-.card{
-cursor:pointer;
-transition:0.3s;
+h1{
+margin-bottom:20px;
 }
 
-.card img{
-width:100%;
-border-radius:10px;
+.vitrina{
+display:flex;
+gap:16px;
+overflow-x:auto;
+padding-bottom:20px;
+}
+
+.card{
+min-width:180px;
+cursor:pointer;
+transition:0.2s;
 }
 
 .card:hover{
 transform:scale(1.05);
 }
 
-#ad{
-display:none;
+.card img{
+width:100%;
+border-radius:12px;
+}
+
+.title{
+margin-top:8px;
+font-size:14px;
+}
+
+#playerModal{
 position:fixed;
 top:0;
 left:0;
 width:100%;
 height:100%;
-background:black;
+background:rgba(0,0,0,0.9);
+display:none;
+align-items:center;
+justify-content:center;
 z-index:999;
+}
+
+#playerModal video{
+width:80%;
+max-width:900px;
+}
+
+.close{
+position:absolute;
+top:30px;
+right:40px;
+font-size:40px;
+cursor:pointer;
 }
 
 </style>
@@ -53,115 +79,69 @@ z-index:999;
 
 <body>
 
-<div class="grid">
+<h1>Сериалы</h1>
+
+<div class="vitrina">
 
 <div class="card" onclick="playAd()">
-<img src="posters/grand.jpg">
-</div>
-
-<div class="card" onclick="playAd()">
-<img src="posters/witcher.jpg">
-</div>
-
-<div class="card" onclick="playAd()">
-<img src="posters/lastofus.jpg">
+<img src="posters/papiny-dochki.jpg">
+<div class="title">Папины дочки</div>
 </div>
 
 <div class="card" onclick="playAd()">
-<img src="posters/dune.jpg">
+<img src="posters/kuhnya.jpg">
+<div class="title">Кухня</div>
 </div>
 
 <div class="card" onclick="playAd()">
-<img src="posters/avatar.jpg">
+<img src="posters/granj.jpg">
+<div class="title">Гранж</div>
+</div>
+
+<div class="card" onclick="playAd()">
+<img src="posters/deti-peremen.jpg">
+<div class="title">Дети перемен</div>
+</div>
+
+<div class="card" onclick="playAd()">
+<img src="posters/slovo-pacana.jpg">
+<div class="title">Слово пацана</div>
+</div>
+
+<div class="card" onclick="playAd()">
+<img src="posters/obnalshik.jpg">
+<div class="title">Обнальщик</div>
 </div>
 
 </div>
 
 
-<div id="ad">
+<div id="playerModal">
+
+<div class="close" onclick="closePlayer()">×</div>
 
 <video
-id="player"
+id="vastPlayer"
 class="video-js vjs-default-skin"
 controls
 autoplay
-width="100%"
-height="100%">
+width="800"
+height="450">
+
+<source src="YOUR_VAST_TAG_HERE" type="application/x-mpegURL">
+
 </video>
 
 </div>
 
-
 <script>
 
-function deviceUID(){
-let uid = localStorage.getItem("uid");
-
-if(!uid){
-uid = crypto.randomUUID();
-localStorage.setItem("uid",uid);
-}
-
-return uid;
-}
-
-function deviceType(){
-
-if(/Mobi|Android/i.test(navigator.userAgent)){
-return "mobile";
-}
-
-return "desktop";
-
-}
-
-function vastURL(){
-
-let uid=deviceUID();
-let domain=location.hostname;
-let type=deviceType();
-
-if(type==="mobile"){
-
-return `https://ssp.wink.ru/v1/rt/avod/vast?ad_place_type=preroll&age_value=18&broadcast_type=ott&client_id=${uid}&client_version=&domain=${domain}&embedded=P5&is_child=false&is_paid=0&location=100001&san=web_vast_code&ad_position=1&content_id=23080&device_type=NCWEB&web_client_type=mobile`;
-
-}else{
-
-return `https://ssp.wink.ru/v1/rt/avod/vast?ad_place_type=preroll&age_value=18&broadcast_type=ott&client_id=${uid}&client_version=&domain=${domain}&embedded=P5&is_child=false&is_paid=0&location=100001&san=web_vast_code&ad_position=1&content_id=23080&device_type=NCWEB&web_client_type=desktop`;
-
-}
-
-}
-
 function playAd(){
-
-document.getElementById("ad").style.display="block";
-
-let player = videojs("player");
-
-player.src({
-src: vastURL(),
-type:"application/x-mpegURL"
-});
-
-player.play();
-
-player.on("ended",function(){
-
-document.getElementById("ad").style.display="none";
-
-openTelegram();
-
-});
-
+document.getElementById("playerModal").style.display="flex";
 }
 
-function openTelegram(){
-
-if(window.Telegram){
-Telegram.WebApp.openTelegramLink("https://t.me/");
-}
-
+function closePlayer(){
+document.getElementById("playerModal").style.display="none";
 }
 
 </script>
