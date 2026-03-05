@@ -2,168 +2,149 @@
 <html lang="ru">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Telepub</title>
+<title>Кинотеатр</title>
+
+<script src="https://cdn.jsdelivr.net/npm/video.js@7/dist/video.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/videojs-contrib-ads@6/dist/videojs.ads.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/videojs-vast-vpaid@2/dist/videojs.vast.vpaid.min.js"></script>
+
+<link href="https://cdn.jsdelivr.net/npm/video.js@7/dist/video-js.min.css" rel="stylesheet">
 
 <style>
 
 body{
-margin:0;
 background:#0f0f0f;
-font-family:Arial;
 color:white;
-overflow-x:hidden;
-}
-
-.section{
+font-family:Arial;
+margin:0;
 padding:20px;
 }
 
-.section h2{
-margin:10px 0 15px;
-font-size:22px;
+h1{
+margin-bottom:20px;
 }
 
-.row{
+.vitrina{
 display:flex;
-gap:18px;
+gap:20px;
 overflow-x:auto;
-padding-bottom:10px;
+padding-bottom:20px;
 }
 
-.row::-webkit-scrollbar{
+.vitrina::-webkit-scrollbar{
 display:none;
 }
 
-.poster{
-min-width:180px;
-height:270px;
-border-radius:14px;
-overflow:hidden;
+.card{
+min-width:240px;
 cursor:pointer;
-transition:transform .25s;
-flex-shrink:0;
-box-shadow:0 10px 30px rgba(0,0,0,.6);
+transition:0.25s;
 }
 
-.poster img{
-width:100%;
-height:100%;
+.card:hover{
+transform:scale(1.05);
+}
+
+.card img{
+width:240px;
+height:360px;
 object-fit:cover;
-}
-
-.poster:hover{
-transform:scale(1.08);
+border-radius:16px;
 }
 
 .title{
-margin-top:8px;
+margin-top:10px;
 font-size:16px;
 }
 
-/* PLAYER */
-
-.playerOverlay{
+#playerModal{
 position:fixed;
 top:0;
 left:0;
 width:100%;
 height:100%;
-background:rgba(0,0,0,.92);
+background:black;
 display:none;
 align-items:center;
 justify-content:center;
-z-index:9999;
+z-index:999;
 }
 
-.playerBox{
+#vastPlayer{
 width:90%;
 max-width:900px;
-aspect-ratio:16/9;
-background:black;
 }
 
-.closeBtn{
+.close{
 position:absolute;
-top:20px;
-right:25px;
-font-size:30px;
+top:30px;
+right:40px;
+font-size:40px;
 cursor:pointer;
 }
 
 </style>
 </head>
 
-
 <body>
 
-<div class="section">
+<h1>Сериалы</h1>
 
-<h2>Популярное</h2>
+<div class="vitrina">
 
-<div class="row">
-
-<div class="poster" onclick="playAd()">
-<img src="posters/drstrange.jpg">
+<div class="card" onclick="playAd()">
+<img src="posters/molodezhka.jpg">
+<div class="title">Молодежка</div>
 </div>
 
-<div class="poster" onclick="playAd()">
-<img src="posters/darkknight.jpg">
+<div class="card" onclick="playAd()">
+<img src="posters/kuhnya.jpg">
+<div class="title">Кухня</div>
 </div>
 
-<div class="poster" onclick="playAd()">
-<img src="posters/joker.jpg">
+<div class="card" onclick="playAd()">
+<img src="posters/grand.jpg">
+<div class="title">Гранд</div>
 </div>
 
+<div class="card" onclick="playAd()">
+<img src="posters/deti-peremen.jpg">
+<div class="title">Дети перемен</div>
 </div>
 
-
-<h2>Сериалы</h2>
-
-<div class="row">
-
-<div class="poster" onclick="playAd()">
-<img src="posters/ad_astra.jpg">
+<div class="card" onclick="playAd()">
+<img src="posters/slovo-pacana.jpg">
+<div class="title">Слово пацана</div>
 </div>
 
-<div class="poster" onclick="playAd()">
-<img src="posters/avengers.jpg">
-</div>
-
-<div class="poster" onclick="playAd()">
-<img src="posters/raya.jpg">
-</div>
-
-<div class="poster" onclick="playAd()">
-<img src="posters/badboys.jpg">
-</div>
-
+<div class="card" onclick="playAd()">
+<img src="posters/obnalshik.jpg">
+<div class="title">Обнальщик</div>
 </div>
 
 </div>
 
 
+<div id="playerModal">
 
-<div class="playerOverlay" id="playerOverlay">
+<div class="close" onclick="closePlayer()">×</div>
 
-<div class="closeBtn" onclick="closePlayer()">✕</div>
-
-<div class="playerBox">
-<iframe id="vastFrame"
-width="100%"
-height="100%"
-frameborder="0"
-allow="autoplay">
-</iframe>
-</div>
+<video
+id="vastPlayer"
+class="video-js vjs-default-skin"
+controls
+playsinline
+></video>
 
 </div>
 
 
 <script>
 
+let player
+
 function generateUID(){
-return 'uid-'+Math.random().toString(36).substr(2,9)
+return 'uid-'+Math.random().toString(36).substring(2,10)
 }
 
 function getDevice(){
@@ -176,37 +157,63 @@ return "desktop"
 
 }
 
-function buildVast(){
+function buildVAST(){
 
 let uid = generateUID()
-let domain = location.hostname || "tma"
+
 let device = getDevice()
 
-let base="https://ssp.wink.ru/v1/rt/avod/vast?ad_place_type=preroll&age_value=18&broadcast_type=ott&client_id="+uid+"&client_version=&domain="+domain+"&embedded=P5&is_child=false&is_paid=0&location=100001&san=web_vast_code&ad_position=1&content_id=23080&device_type=NCWEB"
+let domain = location.hostname || "tma"
+
+let url = "https://ssp.wink.ru/v1/rt/avod/vast?ad_place_type=preroll&age_value=18&broadcast_type=ott"
++"&client_id="+uid
++"&client_version="
++"&domain="+domain
++"&embedded=P5"
++"&is_child=false"
++"&is_paid=0"
++"&location=100001"
++"&san=web_vast_code"
++"&ad_position=1"
++"&content_id=23080"
++"&device_type=NCWEB"
 
 if(device=="mobile"){
-base += "&web_client_type=mobile"
+url += "&web_client_type=mobile"
 }else{
-base += "&web_client_type=desktop"
+url += "&web_client_type=desktop"
 }
 
-return base
+return url
 
 }
 
 function playAd(){
 
-let url = buildVast()
+document.getElementById("playerModal").style.display="flex"
 
-document.getElementById("vastFrame").src = url
-document.getElementById("playerOverlay").style.display="flex"
+let vastTag = buildVAST()
+
+player = videojs('vastPlayer')
+
+player.vastClient({
+adTagUrl: vastTag,
+playAdAlways: true,
+verbosity: 0
+})
+
+player.muted(false)
+player.play()
 
 }
 
 function closePlayer(){
 
-document.getElementById("vastFrame").src=""
-document.getElementById("playerOverlay").style.display="none"
+if(player){
+player.dispose()
+}
+
+document.getElementById("playerModal").style.display="none"
 
 }
 
