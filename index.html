@@ -1,128 +1,51 @@
 <!DOCTYPE html>
 <html>
 <head>
-
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>TelePub</title>
 
-<title>Кинотеатр</title>
+<script src="https://cdn.jsdelivr.net/npm/video.js@7/dist/video.min.js"></script>
+<link href="https://cdn.jsdelivr.net/npm/video.js@7/dist/video-js.min.css" rel="stylesheet">
 
 <style>
 
 body{
 margin:0;
-background:#0f0f0f;
-color:#fff;
-font-family:system-ui;
+background:#0b0b0b;
+font-family:Arial;
+color:white;
 }
 
-.section{
-padding:20px 16px;
-}
-
-.section-title{
-font-size:22px;
-font-weight:600;
-margin-bottom:12px;
-}
-
-.carousel{
-display:flex;
-overflow-x:auto;
-gap:14px;
-scroll-behavior:smooth;
-}
-
-.carousel::-webkit-scrollbar{
-display:none;
+.grid{
+display:grid;
+grid-template-columns:repeat(auto-fill,minmax(160px,1fr));
+gap:20px;
+padding:20px;
 }
 
 .card{
-min-width:150px;
 cursor:pointer;
-transition:transform .25s;
+transition:0.3s;
+}
+
+.card img{
+width:100%;
+border-radius:10px;
 }
 
 .card:hover{
 transform:scale(1.05);
 }
 
-.poster{
-width:150px;
-height:220px;
-border-radius:16px;
-object-fit:cover;
-background:#222;
-}
-
-.title{
-font-size:14px;
-margin-top:8px;
-}
-
-.rating{
-position:absolute;
-top:8px;
-left:8px;
-background:#ff6a00;
-padding:4px 8px;
-border-radius:10px;
-font-size:12px;
-font-weight:600;
-}
-
-.card-wrap{
-position:relative;
-}
-
-#playerOverlay{
+#ad{
+display:none;
 position:fixed;
 top:0;
 left:0;
 width:100%;
 height:100%;
-background:#000;
-display:none;
+background:black;
 z-index:999;
-align-items:center;
-justify-content:center;
-}
-
-video{
-width:100%;
-height:100%;
-object-fit:contain;
-}
-
-#loader{
-position:absolute;
-color:#fff;
-font-size:18px;
-}
-
-#closeBtn{
-position:absolute;
-top:20px;
-right:20px;
-background:#0008;
-border:none;
-color:#fff;
-font-size:22px;
-padding:6px 12px;
-border-radius:8px;
-}
-
-.skeleton{
-width:150px;
-height:220px;
-border-radius:16px;
-background:linear-gradient(90deg,#222,#333,#222);
-animation:load 1.4s infinite;
-}
-
-@keyframes load{
-0%{background-position:-200px}
-100%{background-position:200px}
 }
 
 </style>
@@ -130,126 +53,114 @@ animation:load 1.4s infinite;
 
 <body>
 
-<div class="section">
+<div class="grid">
 
-<div class="section-title">Популярные сериалы</div>
+<div class="card" onclick="playAd()">
+<img src="posters/grand.jpg">
+</div>
 
-<div class="carousel" id="carousel"></div>
+<div class="card" onclick="playAd()">
+<img src="posters/witcher.jpg">
+</div>
+
+<div class="card" onclick="playAd()">
+<img src="posters/lastofus.jpg">
+</div>
+
+<div class="card" onclick="playAd()">
+<img src="posters/dune.jpg">
+</div>
+
+<div class="card" onclick="playAd()">
+<img src="posters/avatar.jpg">
+</div>
 
 </div>
 
 
-<div id="playerOverlay">
+<div id="ad">
 
-<button id="closeBtn">✕</button>
-
-<div id="loader">Загрузка рекламы...</div>
-
-<video id="video" playsinline muted></video>
+<video
+id="player"
+class="video-js vjs-default-skin"
+controls
+autoplay
+width="100%"
+height="100%">
+</video>
 
 </div>
 
 
 <script>
 
-const shows=[
+function deviceUID(){
+let uid = localStorage.getItem("uid");
 
-{title:"Папины дочки",poster:"posters/papiny-dochki.jpg",rating:"9.3"},
-{title:"Кухня",poster:"posters/kuhnya.jpg",rating:"9.4"},
-{title:"Гранд",poster:"posters/grand.jpg",rating:"8.7"},
-{title:"Дети перемен",poster:"posters/deti-peremen.jpg",rating:"8.9"},
-{title:"Слово пацана",poster:"posters/slovo-pacana.jpg",rating:"9.5"},
-{title:"Обнальщик",poster:"posters/obnalshik.jpg",rating:"8.6"}
+if(!uid){
+uid = crypto.randomUUID();
+localStorage.setItem("uid",uid);
+}
 
-];
+return uid;
+}
 
-const carousel=document.getElementById("carousel");
+function deviceType(){
 
-shows.forEach(show=>{
+if(/Mobi|Android/i.test(navigator.userAgent)){
+return "mobile";
+}
 
-const card=document.createElement("div");
-
-card.className="card";
-
-card.innerHTML=`
-
-<div class="card-wrap">
-
-<img class="poster" src="${show.poster}">
-
-<div class="rating">${show.rating}</div>
-
-</div>
-
-<div class="title">${show.title}</div>
-
-`;
-
-card.onclick=()=>openPlayer();
-
-carousel.appendChild(card);
-
-});
-
-
-// VAST PLAYER
-
-const video=document.getElementById("video");
-const overlay=document.getElementById("playerOverlay");
-const loader=document.getElementById("loader");
-
-const deviceId = localStorage.device_id ||
-(localStorage.device_id = crypto.randomUUID());
-
-const domain=location.hostname;
-
-const vastUrl=`https://ssp.wink.ru/v1/rt/avod/vast?ad_place_type=preroll&age_value=18&broadcast_type=ott&client_id=${deviceId}&client_version=&domain=${domain}&embedded=P5&is_child=false&is_paid=0&location=100001&san=web_vast_code&ad_position=1&content_id=23080&device_type=NCWEB&web_client_type=mobile`;
-
-
-async function openPlayer(){
-
-overlay.style.display="flex";
-
-loader.style.display="block";
-
-video.pause();
-video.src="";
-
-const res=await fetch(vastUrl);
-
-const xmlText=await res.text();
-
-const xml=new DOMParser().parseFromString(xmlText,"text/xml");
-
-const mediaFile=xml.querySelector("MediaFile");
-
-if(!mediaFile){
-
-loader.innerText="Реклама не найдена";
-return;
+return "desktop";
 
 }
 
-video.src=mediaFile.textContent.trim();
+function vastURL(){
 
-loader.style.display="none";
+let uid=deviceUID();
+let domain=location.hostname;
+let type=deviceType();
 
-video.play();
+if(type==="mobile"){
+
+return `https://ssp.wink.ru/v1/rt/avod/vast?ad_place_type=preroll&age_value=18&broadcast_type=ott&client_id=${uid}&client_version=&domain=${domain}&embedded=P5&is_child=false&is_paid=0&location=100001&san=web_vast_code&ad_position=1&content_id=23080&device_type=NCWEB&web_client_type=mobile`;
+
+}else{
+
+return `https://ssp.wink.ru/v1/rt/avod/vast?ad_place_type=preroll&age_value=18&broadcast_type=ott&client_id=${uid}&client_version=&domain=${domain}&embedded=P5&is_child=false&is_paid=0&location=100001&san=web_vast_code&ad_position=1&content_id=23080&device_type=NCWEB&web_client_type=desktop`;
 
 }
 
+}
 
-video.addEventListener("ended",()=>{
+function playAd(){
 
-overlay.style.display="none";
+document.getElementById("ad").style.display="block";
+
+let player = videojs("player");
+
+player.src({
+src: vastURL(),
+type:"application/x-mpegURL"
+});
+
+player.play();
+
+player.on("ended",function(){
+
+document.getElementById("ad").style.display="none";
+
+openTelegram();
 
 });
 
+}
 
-document.getElementById("closeBtn").onclick=()=>{
+function openTelegram(){
 
-overlay.style.display="none";
-video.pause();
+if(window.Telegram){
+Telegram.WebApp.openTelegramLink("https://t.me/");
+}
 
 }
 
