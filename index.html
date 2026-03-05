@@ -26,7 +26,7 @@ margin-bottom:20px;
 
 .vitrina{
 display:flex;
-gap:20px;
+gap:24px;
 overflow-x:auto;
 padding-bottom:20px;
 }
@@ -36,7 +36,7 @@ display:none;
 }
 
 .card{
-min-width:240px;
+min-width:260px;
 cursor:pointer;
 transition:0.25s;
 }
@@ -46,15 +46,15 @@ transform:scale(1.05);
 }
 
 .card img{
-width:240px;
-height:360px;
+width:260px;
+height:390px;
 object-fit:cover;
 border-radius:16px;
 }
 
 .title{
 margin-top:10px;
-font-size:16px;
+font-size:18px;
 }
 
 #playerModal{
@@ -148,21 +148,17 @@ return 'uid-'+Math.random().toString(36).substring(2,10)
 }
 
 function getDevice(){
-
 if(/Android|iPhone|iPad|iPod/i.test(navigator.userAgent)){
 return "mobile"
 }else{
 return "desktop"
 }
-
 }
 
 function buildVAST(){
 
 let uid = generateUID()
-
 let device = getDevice()
-
 let domain = location.hostname || "tma"
 
 let url = "https://ssp.wink.ru/v1/rt/avod/vast?ad_place_type=preroll&age_value=18&broadcast_type=ott"
@@ -198,11 +194,9 @@ player = videojs('vastPlayer')
 
 player.vastClient({
 adTagUrl: vastTag,
-playAdAlways: true,
-verbosity: 0
+playAdAlways: true
 })
 
-player.muted(false)
 player.play()
 
 }
