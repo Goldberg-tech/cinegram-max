@@ -1,182 +1,216 @@
 <!DOCTYPE html>
-<html>
+<html lang="ru">
 <head>
 <meta charset="UTF-8">
-<title>Cinema Test</title>
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Telepub</title>
 
 <style>
 
 body{
-background:#0f0f0f;
-color:white;
-font-family:Arial;
 margin:0;
+background:#0f0f0f;
+font-family:Arial;
+color:white;
 overflow-x:hidden;
 }
 
-h2{
-margin:20px;
-font-weight:600;
+.section{
+padding:20px;
+}
+
+.section h2{
+margin:10px 0 15px;
+font-size:22px;
 }
 
 .row{
 display:flex;
+gap:18px;
 overflow-x:auto;
-padding:20px;
-gap:20px;
-scroll-behavior:smooth;
+padding-bottom:10px;
+}
+
+.row::-webkit-scrollbar{
+display:none;
 }
 
 .poster{
-min-width:220px;
-height:330px;
-border-radius:10px;
-background-size:cover;
-background-position:center;
+min-width:180px;
+height:270px;
+border-radius:14px;
+overflow:hidden;
 cursor:pointer;
 transition:transform .25s;
+flex-shrink:0;
+box-shadow:0 10px 30px rgba(0,0,0,.6);
+}
+
+.poster img{
+width:100%;
+height:100%;
+object-fit:cover;
 }
 
 .poster:hover{
 transform:scale(1.08);
 }
 
-.grid{
-display:grid;
-grid-template-columns:repeat(auto-fill, minmax(220px,1fr));
-gap:20px;
-padding:20px;
+.title{
+margin-top:8px;
+font-size:16px;
 }
 
-.modal{
+/* PLAYER */
+
+.playerOverlay{
 position:fixed;
 top:0;
 left:0;
 width:100%;
 height:100%;
-background:rgba(0,0,0,.9);
+background:rgba(0,0,0,.92);
 display:none;
 align-items:center;
 justify-content:center;
-z-index:999;
+z-index:9999;
 }
 
-.player{
-width:80%;
+.playerBox{
+width:90%;
 max-width:900px;
 aspect-ratio:16/9;
 background:black;
 }
 
-.close{
+.closeBtn{
 position:absolute;
 top:20px;
-right:30px;
+right:25px;
 font-size:30px;
 cursor:pointer;
 }
 
 </style>
-
-<!-- Yandex.Metrika -->
-<script type="text/javascript">
-(function(m,e,t,r,i,k,a){
-m[i]=m[i]||function(){(m[i].a=m[i].a||[]).push(arguments)};
-m[i].l=1*new Date();
-for (var j = 0; j < document.scripts.length; j++) {if (document.scripts[j].src === r) { return; }}
-k=e.createElement(t),a=e.getElementsByTagName(t)[0],k.async=1,k.src=r,a.parentNode.insertBefore(k,a)
-})(window, document,'script','https://mc.yandex.ru/metrika/tag.js?id=106980512', 'ym');
-
-ym(106980512, 'init', {
-clickmap:true,
-trackLinks:true,
-accurateTrackBounce:true,
-webvisor:true
-});
-</script>
-
 </head>
 
+
 <body>
+
+<div class="section">
 
 <h2>Популярное</h2>
 
 <div class="row">
 
-<div class="poster" onclick="openPlayer()" style="background-image:url('https://image.tmdb.org/t/p/w500/9Gtg2DzBhmYamXBS1hKAhiwbBKS.jpg')"></div>
+<div class="poster" onclick="playAd()">
+<img src="posters/drstrange.jpg">
+</div>
 
-<div class="poster" onclick="openPlayer()" style="background-image:url('https://image.tmdb.org/t/p/w500/qJ2tW6WMUDux911r6m7haRef0WH.jpg')"></div>
+<div class="poster" onclick="playAd()">
+<img src="posters/darkknight.jpg">
+</div>
 
-<div class="poster" onclick="openPlayer()" style="background-image:url('https://image.tmdb.org/t/p/w500/kqjL17yufvn9OVLyXYpvtyrFfak.jpg')"></div>
-
-<div class="poster" onclick="openPlayer()" style="background-image:url('https://image.tmdb.org/t/p/w500/udDclJoHjfjb8Ekgsd4FDteOkCU.jpg')"></div>
-
-<div class="poster" onclick="openPlayer()" style="background-image:url('https://image.tmdb.org/t/p/w500/1g0dhYtq4irTY1GPXvft6k4YLjm.jpg')"></div>
+<div class="poster" onclick="playAd()">
+<img src="posters/joker.jpg">
+</div>
 
 </div>
 
 
 <h2>Сериалы</h2>
 
-<div class="grid">
+<div class="row">
 
-<div class="poster" onclick="openPlayer()" style="background-image:url('https://image.tmdb.org/t/p/w500/xBHvZcjRiWyobQ9kxBhO6B2dtRI.jpg')"></div>
+<div class="poster" onclick="playAd()">
+<img src="posters/ad_astra.jpg">
+</div>
 
-<div class="poster" onclick="openPlayer()" style="background-image:url('https://image.tmdb.org/t/p/w500/7WsyChQLEftFiDOVTGkv3hFpyyt.jpg')"></div>
+<div class="poster" onclick="playAd()">
+<img src="posters/avengers.jpg">
+</div>
 
-<div class="poster" onclick="openPlayer()" style="background-image:url('https://image.tmdb.org/t/p/w500/lPsD10PP4rgUGiGR4CCXA6iY0QQ.jpg')"></div>
+<div class="poster" onclick="playAd()">
+<img src="posters/raya.jpg">
+</div>
 
-<div class="poster" onclick="openPlayer()" style="background-image:url('https://image.tmdb.org/t/p/w500/y95lQLnuNKdPAzw9F9Ab8kJ80c3.jpg')"></div>
+<div class="poster" onclick="playAd()">
+<img src="posters/badboys.jpg">
+</div>
+
+</div>
 
 </div>
 
 
 
-<div class="modal" id="modal">
+<div class="playerOverlay" id="playerOverlay">
 
-<div class="close" onclick="closePlayer()">✕</div>
+<div class="closeBtn" onclick="closePlayer()">✕</div>
 
-<iframe id="player"
-class="player"
+<div class="playerBox">
+<iframe id="vastFrame"
+width="100%"
+height="100%"
 frameborder="0"
-allowfullscreen
-></iframe>
-
+allow="autoplay">
+</iframe>
 </div>
 
+</div>
 
 
 <script>
 
 function generateUID(){
-return 'uid-'+Math.random().toString(36).substring(2,12)
+return 'uid-'+Math.random().toString(36).substr(2,9)
 }
 
-function openPlayer(){
+function getDevice(){
+
+if(/Android|iPhone|iPad|iPod/i.test(navigator.userAgent)){
+return "mobile"
+}else{
+return "desktop"
+}
+
+}
+
+function buildVast(){
 
 let uid = generateUID()
+let domain = location.hostname || "tma"
+let device = getDevice()
 
-let isMobile = /Android|iPhone|iPad/i.test(navigator.userAgent)
+let base="https://ssp.wink.ru/v1/rt/avod/vast?ad_place_type=preroll&age_value=18&broadcast_type=ott&client_id="+uid+"&client_version=&domain="+domain+"&embedded=P5&is_child=false&is_paid=0&location=100001&san=web_vast_code&ad_position=1&content_id=23080&device_type=NCWEB"
 
-let vastDesktop="https://ssp.wink.ru/v1/rt/avod/vast?ad_place_type=preroll&age_value=18&broadcast_type=ott&client_id="+uid+"&client_version=&domain=tma&embedded=P5&is_child=false&is_paid=0&location=100001&san=web_vast_code&ad_position=1&content_id=23080&device_type=NCWEB&web_client_type=desktop"
+if(device=="mobile"){
+base += "&web_client_type=mobile"
+}else{
+base += "&web_client_type=desktop"
+}
 
-let vastMobile="https://ssp.wink.ru/v1/rt/avod/vast?ad_place_type=preroll&age_value=18&broadcast_type=ott&client_id="+uid+"&client_version=&domain=tma&embedded=P5&is_child=false&is_paid=0&location=100001&san=web_vast_code&ad_position=1&content_id=23080&device_type=NCWEB&web_client_type=mobile"
+return base
 
-let url = isMobile ? vastMobile : vastDesktop
+}
 
-document.getElementById("player").src = "https://player.aniview.com/player/?vast="+encodeURIComponent(url)
+function playAd(){
 
-document.getElementById("modal").style.display="flex"
+let url = buildVast()
+
+document.getElementById("vastFrame").src = url
+document.getElementById("playerOverlay").style.display="flex"
 
 }
 
 function closePlayer(){
-document.getElementById("modal").style.display="none"
-document.getElementById("player").src=""
+
+document.getElementById("vastFrame").src=""
+document.getElementById("playerOverlay").style.display="none"
+
 }
 
 </script>
-
 
 </body>
 </html>
