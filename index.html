@@ -2,52 +2,30 @@
 <html>
 <head>
 <meta charset="UTF-8">
-
 <title>TelePub</title>
 
-<script src="https://imasdk.googleapis.com/js/sdkloader/ima3.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/video.js@7/dist/video.min.js"></script>
+<link href="https://cdn.jsdelivr.net/npm/video.js@7/dist/video-js.min.css" rel="stylesheet">
 
 <style>
 
 body{
 margin:0;
-background:#0f0f0f;
+background:#0b0b0b;
 font-family:Arial;
 color:white;
-overflow-x:hidden;
 }
 
-.section{
-padding:25px;
-}
-
-.section-title{
-font-size:22px;
-margin-bottom:15px;
-}
-
-.row{
-display:flex;
-gap:16px;
-overflow-x:auto;
-scroll-behavior:smooth;
-padding-bottom:10px;
-}
-
-.row::-webkit-scrollbar{
-height:8px;
-}
-
-.row::-webkit-scrollbar-thumb{
-background:#444;
-border-radius:10px;
+.grid{
+display:grid;
+grid-template-columns:repeat(auto-fill,minmax(160px,1fr));
+gap:20px;
+padding:20px;
 }
 
 .card{
-flex:0 0 auto;
-width:180px;
 cursor:pointer;
-transition:0.25s;
+transition:0.3s;
 }
 
 .card img{
@@ -56,77 +34,70 @@ border-radius:10px;
 }
 
 .card:hover{
-transform:scale(1.07);
+transform:scale(1.05);
 }
 
-#adContainer{
+#ad{
+display:none;
 position:fixed;
 top:0;
 left:0;
 width:100%;
 height:100%;
 background:black;
-display:none;
 z-index:999;
 }
 
-#videoElement{
-width:100%;
-height:100%;
-}
-
 </style>
-
 </head>
 
 <body>
 
-
-<div class="section">
-
-<div class="section-title">Популярные сериалы</div>
-
-<div class="row">
-
-<div class="card" onclick="playAd()">
-<img src="posters/molodezhka.jpg">
-</div>
-
-<div class="card" onclick="playAd()">
-<img src="posters/kuhnya.jpg">
-</div>
+<div class="grid">
 
 <div class="card" onclick="playAd()">
 <img src="posters/grand.jpg">
 </div>
 
 <div class="card" onclick="playAd()">
-<img src="posters/deti-peremen.jpg">
+<img src="posters/witcher.jpg">
 </div>
 
 <div class="card" onclick="playAd()">
-<img src="posters/slovo-pacana.jpg">
+<img src="posters/lastofus.jpg">
 </div>
 
 <div class="card" onclick="playAd()">
-<img src="posters/obnal.jpg">
+<img src="posters/dune.jpg">
+</div>
+
+<div class="card" onclick="playAd()">
+<img src="posters/avatar.jpg">
 </div>
 
 </div>
 
+
+<div id="ad">
+
+<video
+id="player"
+class="video-js vjs-default-skin"
+controls
+autoplay
+playsinline
+width="100%"
+height="100%">
+</video>
+
 </div>
-
-
-
-<div id="adContainer">
-<video id="videoElement"></video>
-</div>
-
 
 
 <script>
 
-function getUID(){
+const player = videojs("player");
+
+function deviceUID(){
 
 let uid = localStorage.getItem("uid");
 
@@ -139,9 +110,7 @@ return uid;
 
 }
 
-
-
-function getDevice(){
+function deviceType(){
 
 if(/Mobi|Android/i.test(navigator.userAgent)){
 return "mobile";
@@ -151,13 +120,11 @@ return "desktop";
 
 }
 
+function vastURL(){
 
-
-function getVast(){
-
-let uid = getUID();
-let domain = location.hostname;
-let type = getDevice();
+let uid=deviceUID();
+let domain=location.hostname;
+let type=deviceType();
 
 if(type==="mobile"){
 
@@ -173,87 +140,84 @@ return `https://ssp.wink.ru/v1/rt/avod/vast?ad_place_type=preroll&age_value=18&b
 
 
 
-let adsLoader;
-let adsManager;
+async function fetchVast(url, depth=0){
 
+if(depth>5) throw "wrapper loop";
 
+const res = await fetch(url);
+const xmlText = await res.text();
 
-function playAd(){
+const xml = new DOMParser().parseFromString(xmlText,"text/xml");
 
-document.getElementById("adContainer").style.display="block";
+const wrapper = xml.querySelector("Wrapper VASTAdTagURI");
 
-let videoContent = document.getElementById("videoElement");
+if(wrapper){
 
-let adDisplayContainer = new google.ima.AdDisplayContainer(
-document.getElementById("adContainer"),
-videoContent
-);
+const next = wrapper.textContent.trim();
+return fetchVast(next, depth+1);
 
-adDisplayContainer.initialize();
+}
 
-adsLoader = new google.ima.AdsLoader(adDisplayContainer);
-
-adsLoader.addEventListener(
-google.ima.AdsManagerLoadedEvent.Type.ADS_MANAGER_LOADED,
-onAdsManagerLoaded
-);
-
-adsLoader.addEventListener(
-google.ima.AdErrorEvent.Type.AD_ERROR,
-onAdError
-);
-
-let adsRequest = new google.ima.AdsRequest();
-
-adsRequest.adTagUrl = getVast();
-
-adsLoader.requestAds(adsRequest);
+return xml;
 
 }
 
 
 
-function onAdsManagerLoaded(event){
+async function playAd(){
 
-let videoContent = document.getElementById("videoElement");
+document.getElementById("ad").style.display="block";
 
-adsManager = event.getAdsManager(videoContent);
+try{
 
-adsManager.addEventListener(
-google.ima.AdErrorEvent.Type.AD_ERROR,
-onAdError
-);
+const xml = await fetchVast(vastURL());
 
-adsManager.addEventListener(
-google.ima.AdEvent.Type.CONTENT_RESUME_REQUESTED,
-function(){
+const media = xml.querySelector("MediaFile");
 
+if(!media){
+
+console.log("VAST без MediaFile",xml);
+closeAd();
+return;
+
+}
+
+const videoURL = media.textContent.trim();
+
+player.src({
+src:videoURL,
+type:"video/mp4"
+});
+
+player.play();
+
+}catch(e){
+
+console.error(e);
 closeAd();
 
 }
-);
-
-adsManager.init(window.innerWidth,window.innerHeight,google.ima.ViewMode.NORMAL);
-
-adsManager.start();
 
 }
 
 
 
-function onAdError(){
+player.on("ended",function(){
 
 closeAd();
 
-}
+});
 
 
 
 function closeAd(){
 
-document.getElementById("adContainer").style.display="none";
+player.pause();
+document.getElementById("ad").style.display="none";
 
 }
+
+
 
 </script>
 
