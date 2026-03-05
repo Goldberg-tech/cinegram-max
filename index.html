@@ -5,6 +5,9 @@
 <title>Кинотеатр</title>
 
 <script src="https://cdn.jsdelivr.net/npm/video.js@7/dist/video.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/videojs-contrib-ads@6/dist/videojs.ads.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/videojs-vast-vpaid@2/dist/videojs.vast.vpaid.min.js"></script>
+
 <link href="https://cdn.jsdelivr.net/npm/video.js@7/dist/video-js.min.css" rel="stylesheet">
 
 <style>
@@ -23,15 +26,19 @@ margin-bottom:20px;
 
 .vitrina{
 display:flex;
-gap:16px;
+gap:24px;
 overflow-x:auto;
 padding-bottom:20px;
 }
 
+.vitrina::-webkit-scrollbar{
+display:none;
+}
+
 .card{
-min-width:180px;
+min-width:260px;
 cursor:pointer;
-transition:0.2s;
+transition:0.25s;
 }
 
 .card:hover{
@@ -39,13 +46,15 @@ transform:scale(1.05);
 }
 
 .card img{
-width:100%;
-border-radius:12px;
+width:260px;
+height:390px;
+object-fit:cover;
+border-radius:16px;
 }
 
 .title{
-margin-top:8px;
-font-size:14px;
+margin-top:10px;
+font-size:18px;
 }
 
 #playerModal{
@@ -54,15 +63,15 @@ top:0;
 left:0;
 width:100%;
 height:100%;
-background:rgba(0,0,0,0.9);
+background:black;
 display:none;
 align-items:center;
 justify-content:center;
 z-index:999;
 }
 
-#playerModal video{
-width:80%;
+#vastPlayer{
+width:90%;
 max-width:900px;
 }
 
@@ -84,8 +93,8 @@ cursor:pointer;
 <div class="vitrina">
 
 <div class="card" onclick="playAd()">
-<img src="posters/papiny-dochki.jpg">
-<div class="title">Папины дочки</div>
+<img src="posters/molodezhka.jpg">
+<div class="title">Молодежка</div>
 </div>
 
 <div class="card" onclick="playAd()">
@@ -94,8 +103,8 @@ cursor:pointer;
 </div>
 
 <div class="card" onclick="playAd()">
-<img src="posters/granj.jpg">
-<div class="title">Гранж</div>
+<img src="posters/grand.jpg">
+<div class="title">Гранд</div>
 </div>
 
 <div class="card" onclick="playAd()">
@@ -124,24 +133,82 @@ cursor:pointer;
 id="vastPlayer"
 class="video-js vjs-default-skin"
 controls
-autoplay
-width="800"
-height="450">
-
-<source src="YOUR_VAST_TAG_HERE" type="application/x-mpegURL">
-
-</video>
+playsinline
+></video>
 
 </div>
 
+
 <script>
 
+let player
+
+function generateUID(){
+return 'uid-'+Math.random().toString(36).substring(2,10)
+}
+
+function getDevice(){
+if(/Android|iPhone|iPad|iPod/i.test(navigator.userAgent)){
+return "mobile"
+}else{
+return "desktop"
+}
+}
+
+function buildVAST(){
+
+let uid = generateUID()
+let device = getDevice()
+let domain = location.hostname || "tma"
+
+let url = "https://ssp.wink.ru/v1/rt/avod/vast?ad_place_type=preroll&age_value=18&broadcast_type=ott"
++"&client_id="+uid
++"&client_version="
++"&domain="+domain
++"&embedded=P5"
++"&is_child=false"
++"&is_paid=0"
++"&location=100001"
++"&san=web_vast_code"
++"&ad_position=1"
++"&content_id=23080"
++"&device_type=NCWEB"
+
+if(device=="mobile"){
+url += "&web_client_type=mobile"
+}else{
+url += "&web_client_type=desktop"
+}
+
+return url
+
+}
+
 function playAd(){
-document.getElementById("playerModal").style.display="flex";
+
+document.getElementById("playerModal").style.display="flex"
+
+let vastTag = buildVAST()
+
+player = videojs('vastPlayer')
+
+player.vastClient({
+adTagUrl: vastTag,
+playAdAlways: true
+})
+
+player.play()
+
 }
 
 function closePlayer(){
-document.getElementById("playerModal").style.display="none";
+
+if(player){
+player.dispose()
+}
+
+document.getElementById("playerModal").style.display="none"
+
 }
 
 </script>
