@@ -1,267 +1,259 @@
 <!DOCTYPE html>
 <html>
 <head>
+
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>TMA Wink Player</title>
+
+<title>Кинотеатр</title>
 
 <style>
-html,body{
-    margin:0;
-    padding:0;
-    background:black;
-    height:100%;
-    overflow:hidden;
-    font-family:Arial;
+
+body{
+margin:0;
+background:#0f0f0f;
+color:#fff;
+font-family:system-ui;
+}
+
+.section{
+padding:20px 16px;
+}
+
+.section-title{
+font-size:22px;
+font-weight:600;
+margin-bottom:12px;
+}
+
+.carousel{
+display:flex;
+overflow-x:auto;
+gap:14px;
+scroll-behavior:smooth;
+}
+
+.carousel::-webkit-scrollbar{
+display:none;
+}
+
+.card{
+min-width:150px;
+cursor:pointer;
+transition:transform .25s;
+}
+
+.card:hover{
+transform:scale(1.05);
+}
+
+.poster{
+width:150px;
+height:220px;
+border-radius:16px;
+object-fit:cover;
+background:#222;
+}
+
+.title{
+font-size:14px;
+margin-top:8px;
+}
+
+.rating{
+position:absolute;
+top:8px;
+left:8px;
+background:#ff6a00;
+padding:4px 8px;
+border-radius:10px;
+font-size:12px;
+font-weight:600;
+}
+
+.card-wrap{
+position:relative;
+}
+
+#playerOverlay{
+position:fixed;
+top:0;
+left:0;
+width:100%;
+height:100%;
+background:#000;
+display:none;
+z-index:999;
+align-items:center;
+justify-content:center;
 }
 
 video{
-    width:100%;
-    height:100%;
-    object-fit:contain;
-    background:black;
+width:100%;
+height:100%;
+object-fit:contain;
 }
 
 #loader{
-    position:absolute;
-    top:50%;
-    left:50%;
-    transform:translate(-50%,-50%);
-    color:white;
+position:absolute;
+color:#fff;
+font-size:18px;
 }
 
-#skipBtn{
-    position:absolute;
-    top:20px;
-    right:20px;
-    background:rgba(0,0,0,.6);
-    color:white;
-    padding:8px 14px;
-    border-radius:6px;
-    display:none;
-    cursor:pointer;
-    z-index:10;
+#closeBtn{
+position:absolute;
+top:20px;
+right:20px;
+background:#0008;
+border:none;
+color:#fff;
+font-size:22px;
+padding:6px 12px;
+border-radius:8px;
 }
 
-#muteBtn{
-    position:absolute;
-    bottom:20px;
-    right:20px;
-    background:rgba(0,0,0,.6);
-    color:white;
-    padding:8px 14px;
-    border-radius:6px;
-    cursor:pointer;
-    z-index:10;
+.skeleton{
+width:150px;
+height:220px;
+border-radius:16px;
+background:linear-gradient(90deg,#222,#333,#222);
+animation:load 1.4s infinite;
 }
 
-#clickLayer{
-    position:absolute;
-    top:0;
-    left:0;
-    width:100%;
-    height:100%;
+@keyframes load{
+0%{background-position:-200px}
+100%{background-position:200px}
 }
+
 </style>
 </head>
 
 <body>
 
-<div id="loader">Загрузка рекламы...</div>
-<div id="skipBtn">Пропустить</div>
-<div id="muteBtn">🔇</div>
-<div id="clickLayer"></div>
+<div class="section">
 
-<video id="adVideo" playsinline muted autoplay></video>
+<div class="section-title">Популярные сериалы</div>
+
+<div class="carousel" id="carousel"></div>
+
+</div>
+
+
+<div id="playerOverlay">
+
+<button id="closeBtn">✕</button>
+
+<div id="loader">Загрузка рекламы...</div>
+
+<video id="video" playsinline muted></video>
+
+</div>
+
 
 <script>
 
-const tg = window.Telegram?.WebApp;
-if(tg) tg.expand();
+const shows=[
 
-const video = document.getElementById("adVideo");
-const loader = document.getElementById("loader");
-const skipBtn = document.getElementById("skipBtn");
-const muteBtn = document.getElementById("muteBtn");
-const clickLayer = document.getElementById("clickLayer");
+{title:"Папины дочки",poster:"posters/papiny-dochki.jpg",rating:"9.3"},
+{title:"Кухня",poster:"posters/kuhnya.jpg",rating:"9.4"},
+{title:"Гранд",poster:"posters/grand.jpg",rating:"8.7"},
+{title:"Дети перемен",poster:"posters/deti-peremen.jpg",rating:"8.9"},
+{title:"Слово пацана",poster:"posters/slovo-pacana.jpg",rating:"9.5"},
+{title:"Обнальщик",poster:"posters/obnalshik.jpg",rating:"8.6"}
 
-/* ================= DEVICE / DOMAIN ================= */
+];
+
+const carousel=document.getElementById("carousel");
+
+shows.forEach(show=>{
+
+const card=document.createElement("div");
+
+card.className="card";
+
+card.innerHTML=`
+
+<div class="card-wrap">
+
+<img class="poster" src="${show.poster}">
+
+<div class="rating">${show.rating}</div>
+
+</div>
+
+<div class="title">${show.title}</div>
+
+`;
+
+card.onclick=()=>openPlayer();
+
+carousel.appendChild(card);
+
+});
+
+
+// VAST PLAYER
+
+const video=document.getElementById("video");
+const overlay=document.getElementById("playerOverlay");
+const loader=document.getElementById("loader");
 
 const deviceId = localStorage.device_id ||
-    (localStorage.device_id = crypto.randomUUID());
+(localStorage.device_id = crypto.randomUUID());
 
-const domain = window.location.hostname;
+const domain=location.hostname;
 
-/* ================= SSP VAST TEMPLATE ================= */
+const vastUrl=`https://ssp.wink.ru/v1/rt/avod/vast?ad_place_type=preroll&age_value=18&broadcast_type=ott&client_id=${deviceId}&client_version=&domain=${domain}&embedded=P5&is_child=false&is_paid=0&location=100001&san=web_vast_code&ad_position=1&content_id=23080&device_type=NCWEB&web_client_type=mobile`;
 
-const VAST_URL = `https://ssp.wink.ru/v1/rt/avod/vast?ad_place_type=preroll&age_value=18&broadcast_type=ott&client_id=${deviceId}&client_version=&domain=${domain}&embedded=P5&is_child=false&is_paid=0&location=100001&san=web_vast_code&ad_position=1&content_id=23080&device_type=NCWEB&web_client_type=mobile`.replace(/\s+/g,'');
 
-/* ================= STATE ================= */
+async function openPlayer(){
 
-let tracking = {};
-let clickThroughUrl = null;
-let quartiles = {};
-let skipAvailable = false;
+overlay.style.display="flex";
 
-/* ================= FETCH ================= */
+loader.style.display="block";
 
-async function fetchVast(url, depth=0){
+video.pause();
+video.src="";
 
-    if(depth>5) throw "wrapper depth";
+const res=await fetch(vastUrl);
 
-    const res = await fetch(url);
-    const text = await res.text();
+const xmlText=await res.text();
 
-    const xml = new DOMParser().parseFromString(text,"text/xml");
+const xml=new DOMParser().parseFromString(xmlText,"text/xml");
 
-    const wrapper = xml.querySelector("Wrapper VASTAdTagURI");
+const mediaFile=xml.querySelector("MediaFile");
 
-    if(wrapper){
-        return fetchVast(wrapper.textContent.trim(), depth+1);
-    }
+if(!mediaFile){
 
-    return xml;
-}
-
-/* ================= TRACKING ================= */
-
-function fireTracking(event){
-
-    if(!tracking[event]) return;
-
-    tracking[event].forEach(url=>{
-        fetch(url).catch(()=>{});
-    });
+loader.innerText="Реклама не найдена";
+return;
 
 }
 
-/* ================= FLOW ================= */
+video.src=mediaFile.textContent.trim();
 
-function finishAdFlow(){
+loader.style.display="none";
 
-    video.pause();
-    video.currentTime = 0;
+video.play();
 
-    skipAvailable=false;
-    skipBtn.style.display="none";
-
-    loader.style.display="block";
-    loader.innerText="Загрузка рекламы...";
-
-    setTimeout(loadVast,300);
 }
 
-/* ================= LOAD VAST ================= */
-
-async function loadVast(){
-
-    try{
-
-        const xml = await fetchVast(VAST_URL);
-
-        const mediaFile = xml.querySelector("MediaFile");
-
-        if(!mediaFile){
-            loader.innerText="Реклама завершена";
-            return;
-        }
-
-        video.src = mediaFile.textContent.trim();
-        video.load();
-
-        tracking = {};
-        clickThroughUrl = null;
-        quartiles = {};
-
-        xml.querySelectorAll("Tracking").forEach(node=>{
-            const ev = node.getAttribute("event");
-            if(!tracking[ev]) tracking[ev]=[];
-            tracking[ev].push(node.textContent.trim());
-        });
-
-        const imp = xml.querySelector("Impression");
-        if(imp) tracking.impression=[imp.textContent.trim()];
-
-        const clickNode = xml.querySelector("ClickThrough");
-        if(clickNode) clickThroughUrl = clickNode.textContent.trim();
-
-        loader.style.display="none";
-
-        video.muted=true;
-
-        try{
-            await video.play();
-        }catch(e){}
-
-    }catch(e){
-        loader.innerText="Реклама завершена";
-    }
-}
-
-/* ================= EVENTS ================= */
 
 video.addEventListener("ended",()=>{
-    fireTracking("complete");
-    finishAdFlow();
-});
 
-video.addEventListener("timeupdate",()=>{
-
-    if(!video.duration) return;
-
-    const p = video.currentTime / video.duration;
-
-    if(video.currentTime>=5 && !skipAvailable){
-        skipAvailable=true;
-        skipBtn.style.display="block";
-    }
-
-    if(p>=0.25 && !quartiles.q1){
-        quartiles.q1=true;
-        fireTracking("firstQuartile");
-    }
-
-    if(p>=0.5 && !quartiles.q2){
-        quartiles.q2=true;
-        fireTracking("midpoint");
-    }
-
-    if(p>=0.75 && !quartiles.q3){
-        quartiles.q3=true;
-        fireTracking("thirdQuartile");
-    }
+overlay.style.display="none";
 
 });
 
-/* ================= CONTROLS ================= */
 
-skipBtn.onclick=()=>{
-    fireTracking("skip");
-    finishAdFlow();
-};
+document.getElementById("closeBtn").onclick=()=>{
 
-muteBtn.onclick=()=>{
-    video.muted=!video.muted;
-    muteBtn.innerText = video.muted ? "🔇" : "🔊";
-};
+overlay.style.display="none";
+video.pause();
 
-/* ================= CLICK ================= */
-
-clickLayer.onclick=()=>{
-
-    if(!clickThroughUrl) return;
-
-    fireTracking("click");
-
-    if(tg) tg.openLink(clickThroughUrl);
-    else window.open(clickThroughUrl,"_blank");
-
-};
-
-/* ================= START ================= */
-
-loadVast();
+}
 
 </script>
+
 </body>
 </html>
