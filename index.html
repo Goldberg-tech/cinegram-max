@@ -153,16 +153,26 @@ document.getElementById("playerModal").style.display="flex"
 let video = document.getElementById("video")
 let adContainer = document.getElementById("adContainer")
 
-let uid = "uid"+Math.floor(Math.random()*999999999)
+adContainer.innerHTML=""
+
+let uid = localStorage.getItem("uid")
+
+if(!uid){
+uid = "uid"+Math.floor(Math.random()*999999999)
+localStorage.setItem("uid", uid)
+}
 
 let device = /Android|iPhone/i.test(navigator.userAgent) ? "mobile" : "desktop"
 
-let vastUrl = "https://ssp.wink.ru/v1/rt/avod/vast?ad_place_type=preroll"
+let domain = window.location.hostname
+
+let vastUrl =
+"https://ssp.wink.ru/v1/rt/avod/vast?ad_place_type=preroll"
 +"&age_value=18"
 +"&broadcast_type=ott"
 +"&client_id="+uid
 +"&client_version="
-+"&domain=tma"
++"&domain="+domain
 +"&embedded=P5"
 +"&is_child=false"
 +"&is_paid=0"
@@ -205,13 +215,19 @@ let video = document.getElementById("video")
 
 adsManager = event.getAdsManager(video)
 
-adsManager.init(window.innerWidth, window.innerHeight, google.ima.ViewMode.NORMAL)
+adsManager.init(
+window.innerWidth,
+window.innerHeight,
+google.ima.ViewMode.NORMAL
+)
 
 adsManager.start()
 
 }
 
-function onAdError(){
+function onAdError(error){
+
+console.log("Ad error", error)
 
 closePlayer()
 
@@ -223,6 +239,7 @@ document.getElementById("playerModal").style.display="none"
 
 if(adsManager){
 adsManager.destroy()
+adsManager = null
 }
 
 }
