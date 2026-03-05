@@ -1,3 +1,4 @@
+бля, чел, вот ХОРОШИЙ КОД, который ты сделал, в нем все красиво, нужно чтобы в нем работал показ рекламы по васт коду
 <!DOCTYPE html>
 <html>
 <head>
@@ -85,7 +86,6 @@ id="player"
 class="video-js vjs-default-skin"
 controls
 autoplay
-playsinline
 width="100%"
 height="100%">
 </video>
@@ -95,10 +95,7 @@ height="100%">
 
 <script>
 
-const player = videojs("player");
-
 function deviceUID(){
-
 let uid = localStorage.getItem("uid");
 
 if(!uid){
@@ -107,7 +104,6 @@ localStorage.setItem("uid",uid);
 }
 
 return uid;
-
 }
 
 function deviceType(){
@@ -138,86 +134,36 @@ return `https://ssp.wink.ru/v1/rt/avod/vast?ad_place_type=preroll&age_value=18&b
 
 }
 
-
-
-async function fetchVast(url, depth=0){
-
-if(depth>5) throw "wrapper loop";
-
-const res = await fetch(url);
-const xmlText = await res.text();
-
-const xml = new DOMParser().parseFromString(xmlText,"text/xml");
-
-const wrapper = xml.querySelector("Wrapper VASTAdTagURI");
-
-if(wrapper){
-
-const next = wrapper.textContent.trim();
-return fetchVast(next, depth+1);
-
-}
-
-return xml;
-
-}
-
-
-
-async function playAd(){
+function playAd(){
 
 document.getElementById("ad").style.display="block";
 
-try{
-
-const xml = await fetchVast(vastURL());
-
-const media = xml.querySelector("MediaFile");
-
-if(!media){
-
-console.log("VAST без MediaFile",xml);
-closeAd();
-return;
-
-}
-
-const videoURL = media.textContent.trim();
+let player = videojs("player");
 
 player.src({
-src:videoURL,
-type:"video/mp4"
+src: vastURL(),
+type:"application/x-mpegURL"
 });
 
 player.play();
 
-}catch(e){
-
-console.error(e);
-closeAd();
-
-}
-
-}
-
-
-
 player.on("ended",function(){
 
-closeAd();
+document.getElementById("ad").style.display="none";
+
+openTelegram();
 
 });
 
-
-
-function closeAd(){
-
-player.pause();
-document.getElementById("ad").style.display="none";
-
 }
 
+function openTelegram(){
 
+if(window.Telegram){
+Telegram.WebApp.openTelegramLink("https://t.me/");
+}
+
+}
 
 </script>
 
