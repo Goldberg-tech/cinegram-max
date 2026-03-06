@@ -81,7 +81,6 @@ position:relative;
 
 video{
 width:100%;
-height:auto;
 }
 
 .close{
@@ -156,21 +155,6 @@ z-index:9999;
 <div class="title">Гранд</div>
 </div>
 
-<div class="card" onclick="playAd(3)">
-<img src="posters/deti-peremen.jpg">
-<div class="title">Дети перемен</div>
-</div>
-
-<div class="card" onclick="playAd(4)">
-<img src="posters/slovo-pacana.jpg">
-<div class="title">Слово пацана</div>
-</div>
-
-<div class="card" onclick="playAd(5)">
-<img src="posters/obnalshik.jpg">
-<div class="title">Обнальщик</div>
-</div>
-
 </div>
 
 <div id="playerModal">
@@ -201,120 +185,92 @@ let adDisplayContainer
 let adsLoader
 let adsManager
 
-let adCount = 0
-let maxAds = 3
+let adCount=0
+let maxAds=3
+
+let posters=document.querySelectorAll(".card")
+let currentPosterIndex=0
 
 let timerInterval
+let soundEnabled=true
 
-let posters = document.querySelectorAll(".card")
-let currentPosterIndex = 0
+const video=document.getElementById("video")
+const adContainer=document.getElementById("adContainer")
 
-let soundEnabled = true
+adDisplayContainer=new google.ima.AdDisplayContainer(adContainer,video)
 
-
-function playAd(index){
-
-currentPosterIndex = index
-
-adCount = 0
-
-document.getElementById("playerModal").style.display="flex"
-
-resetAds()
-
-startAdRequest()
-
-}
-
-
-function resetAds(){
-
-clearInterval(timerInterval)
-
-if(adsManager){
-adsManager.destroy()
-adsManager = null
-}
-
-if(adsLoader){
-adsLoader.destroy()
-adsLoader = null
-}
-
-document.getElementById("skipAd").style.display="none"
-document.getElementById("adTimer").innerText=""
-
-}
-
-
-function startAdRequest(){
-
-let video = document.getElementById("video")
-let adContainer = document.getElementById("adContainer")
-
-adContainer.innerHTML=""
-
-let uid = localStorage.getItem("uid")
-
-if(!uid){
-uid = "uid"+Math.floor(Math.random()*999999999)
-localStorage.setItem("uid", uid)
-}
-
-let device = /Android|iPhone/i.test(navigator.userAgent) ? "mobile" : "desktop"
-
-let domain = window.location.hostname
-
-let vastUrl =
-"https://ssp.wink.ru/v1/rt/avod/vast?ad_place_type=preroll"
-+"&age_value=18"
-+"&broadcast_type=ott"
-+"&client_id="+uid
-+"&domain="+domain
-+"&embedded=P5"
-+"&is_child=false"
-+"&is_paid=0"
-+"&location=100001"
-+"&san=web_vast_code"
-+"&ad_position=1"
-+"&content_id=23080"
-+"&device_type=NCWEB"
-+"&web_client_type="+device
-+"&cb="+Date.now()
-+"&rnd="+Math.floor(Math.random()*1000000000)
-
-adDisplayContainer = new google.ima.AdDisplayContainer(adContainer, video)
-
-adsLoader = new google.ima.AdsLoader(adDisplayContainer)
+adsLoader=new google.ima.AdsLoader(adDisplayContainer)
 
 adsLoader.addEventListener(
 google.ima.AdsManagerLoadedEvent.Type.ADS_MANAGER_LOADED,
-onAdsManagerLoaded,
-false)
+onAdsManagerLoaded
+)
 
 adsLoader.addEventListener(
 google.ima.AdErrorEvent.Type.AD_ERROR,
-onAdError,
-false)
+onAdError
+)
 
-let adsRequest = new google.ima.AdsRequest()
+function playAd(index){
 
-adsRequest.adTagUrl = vastUrl
-adsRequest.linearAdSlotWidth = window.innerWidth
-adsRequest.linearAdSlotHeight = window.innerHeight
+currentPosterIndex=index
+adCount=0
 
-adsLoader.requestAds(adsRequest)
+document.getElementById("playerModal").style.display="flex"
 
 adDisplayContainer.initialize()
 
+requestAd()
+
 }
 
+function requestAd(){
+
+let uid=localStorage.getItem("uid")
+
+if(!uid){
+uid="uid"+Math.floor(Math.random()*999999999)
+localStorage.setItem("uid",uid)
+}
+
+let device=/Android|iPhone/i.test(navigator.userAgent)?"mobile":"desktop"
+
+let domain=window.location.hostname
+
+let vastUrl=
+"https://ssp.wink.ru/v1/rt/avod/vast?ad_place_type=preroll"
++"&client_id="+uid
++"&domain="+domain
++"&web_client_type="+device
++"&cb="+Date.now()
+
+let adsRequest=new google.ima.AdsRequest()
+
+adsRequest.adTagUrl=vastUrl
+adsRequest.linearAdSlotWidth=window.innerWidth
+adsRequest.linearAdSlotHeight=window.innerHeight
+
+adsLoader.requestAds(adsRequest)
+
+}
 
 function onAdsManagerLoaded(event){
 
-let video = document.getElementById("video")
+if(adsManager){
+adsManager.destroy()
+}
 
-adsManager = event.getAdsManager(video)
+adsManager=event.getAdsManager(video)
+
+adsManager.addEventListener(
+google.ima.AdEvent.Type.COMPLETE,
+onAdComplete
+)
+
+adsManager.addEventListener(
+google.ima.AdEvent.Type.STARTED,
+startTimer
+)
 
 adsManager.init(
 window.innerWidth,
@@ -324,23 +280,27 @@ google.ima.ViewMode.NORMAL
 
 adsManager.start()
 
-adsManager.addEventListener(
-google.ima.AdEvent.Type.COMPLETE,
-onAdComplete
-)
-
-adsManager.addEventListener(
-google.ima.AdEvent.Type.STARTED,
-startAdTimer
-)
-
-adsManager.addEventListener(
-google.ima.AdErrorEvent.Type.AD_ERROR,
-onAdError
-)
-
 }
 
+function startTimer(){
+
+setTimeout(()=>{
+document.getElementById("skipAd").style.display="block"
+},5000)
+
+timerInterval=setInterval(()=>{
+
+let remaining=Math.round(adsManager.getRemainingTime())
+
+document.getElementById("adTimer").innerText="Реклама "+remaining+" сек"
+
+if(remaining<=0){
+clearInterval(timerInterval)
+}
+
+},500)
+
+}
 
 function onAdComplete(){
 
@@ -350,105 +310,63 @@ document.getElementById("skipAd").style.display="none"
 
 adCount++
 
-if(adCount < maxAds){
+if(adCount<maxAds){
 
-if(adsManager){
-adsManager.destroy()
-adsManager = null
-}
-
-setTimeout(()=>{
-startAdRequest()
-},300)
+requestAd()
 
 }else{
 
-goToNextPoster()
+goNextPoster()
 
 }
 
 }
-
-
-function startAdTimer(){
-
-let timer = document.getElementById("adTimer")
-
-setTimeout(()=>{
-
-document.getElementById("skipAd").style.display="block"
-
-},5000)
-
-timerInterval = setInterval(()=>{
-
-if(!adsManager) return
-
-let remaining = Math.max(0, Math.round(adsManager.getRemainingTime()))
-
-timer.innerText = "Реклама: "+remaining+" сек"
-
-if(remaining <= 0){
-
-clearInterval(timerInterval)
-
-}
-
-},500)
-
-}
-
 
 function skipAd(){
 
 if(adsManager){
-adsManager.destroy()
-adsManager = null
+adsManager.stop()
 }
 
-onAdComplete()
-
 }
-
 
 function toggleSound(){
 
-let video = document.getElementById("video")
+soundEnabled=!soundEnabled
 
-soundEnabled = !soundEnabled
+video.muted=!soundEnabled
 
-video.muted = !soundEnabled
-
-document.getElementById("soundBtn").innerText =
-soundEnabled ? "🔊" : "🔇"
+document.getElementById("soundBtn").innerText=
+soundEnabled?"🔊":"🔇"
 
 }
 
+function onAdError(e){
 
-function onAdError(error){
+console.log("Ad error",e)
 
-console.log("Ad error", error)
-
-goToNextPoster()
+goNextPoster()
 
 }
-
 
 function closePlayer(){
 
 document.getElementById("playerModal").style.display="none"
 
-resetAds()
+if(adsManager){
+adsManager.destroy()
+}
+
+clearInterval(timerInterval)
 
 }
 
-
-function goToNextPoster(){
+function goNextPoster(){
 
 currentPosterIndex++
 
-if(currentPosterIndex >= posters.length){
-currentPosterIndex = 0
+if(currentPosterIndex>=posters.length){
+currentPosterIndex=0
 }
 
 playAd(currentPosterIndex)
