@@ -209,38 +209,16 @@ function openPlayer(){
 
 document.getElementById("playerModal").style.display="flex"
 
-initIMA()
-
 adCount = 0
 
-requestAd()
+startAd()
 
 }
 
-function initIMA(){
+function startAd(){
 
 let video = document.getElementById("video")
 let adContainer = document.getElementById("adContainer")
-
-adDisplayContainer = new google.ima.AdDisplayContainer(adContainer, video)
-
-adsLoader = new google.ima.AdsLoader(adDisplayContainer)
-
-adsLoader.addEventListener(
-google.ima.AdsManagerLoadedEvent.Type.ADS_MANAGER_LOADED,
-onAdsManagerLoaded,
-false)
-
-adsLoader.addEventListener(
-google.ima.AdErrorEvent.Type.AD_ERROR,
-onAdError,
-false)
-
-adDisplayContainer.initialize()
-
-}
-
-function requestAd(){
 
 let uid = localStorage.getItem("uid")
 
@@ -270,6 +248,20 @@ let vastUrl =
 +"&cb="+Date.now()
 +"&rnd="+Math.floor(Math.random()*1000000000)
 
+adDisplayContainer = new google.ima.AdDisplayContainer(adContainer, video)
+
+adsLoader = new google.ima.AdsLoader(adDisplayContainer)
+
+adsLoader.addEventListener(
+google.ima.AdsManagerLoadedEvent.Type.ADS_MANAGER_LOADED,
+onAdsManagerLoaded,
+false)
+
+adsLoader.addEventListener(
+google.ima.AdErrorEvent.Type.AD_ERROR,
+onAdError,
+false)
+
 let adsRequest = new google.ima.AdsRequest()
 
 adsRequest.adTagUrl = vastUrl
@@ -277,6 +269,8 @@ adsRequest.linearAdSlotWidth = window.innerWidth
 adsRequest.linearAdSlotHeight = window.innerHeight
 
 adsLoader.requestAds(adsRequest)
+
+adDisplayContainer.initialize()
 
 }
 
@@ -323,11 +317,11 @@ adCount++
 
 if(adCount < maxAds){
 
-requestAd()
+startAd()
 
 }else{
 
-console.log("рекламный блок завершен")
+console.log("3 рекламы показаны")
 
 }
 
@@ -358,9 +352,7 @@ timer.innerText = "Реклама: "+remaining+" сек"
 function skipAd(){
 
 if(adsManager){
-
 adsManager.stop()
-
 }
 
 }
@@ -392,11 +384,7 @@ adCount++
 
 if(adCount < maxAds){
 
-requestAd()
-
-}else{
-
-console.log("рекламный блок завершен")
+startAd()
 
 }
 
