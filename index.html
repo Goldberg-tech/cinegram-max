@@ -188,35 +188,33 @@ border-radius:8px;
 
 <script>
 
+let adDisplayContainer
 let adsLoader
 let adsManager
-let adDisplayContainer
 
-let adCount=0
-let maxAds=3
+let adCount = 0
+let maxAds = 3
 let timerInterval
-let currentPoster=0
+let currentPoster = 0
 
 function playAd(index){
 
-currentPoster=index
-adCount=0
+currentPoster = index
+adCount = 0
 
 document.getElementById("playerModal").style.display="flex"
 
-initIMA()
+let video = document.getElementById("video")
+let adContainer = document.getElementById("adContainer")
 
-requestAd()
+video.innerHTML=""
+adContainer.innerHTML=""
 
-}
+if(!adsLoader){
 
-function initIMA(){
+adDisplayContainer = new google.ima.AdDisplayContainer(adContainer, video)
 
-let video=document.getElementById("video")
-let adContainer=document.getElementById("adContainer")
-
-adDisplayContainer=new google.ima.AdDisplayContainer(adContainer,video)
-adsLoader=new google.ima.AdsLoader(adDisplayContainer)
+adsLoader = new google.ima.AdsLoader(adDisplayContainer)
 
 adsLoader.addEventListener(
 google.ima.AdsManagerLoadedEvent.Type.ADS_MANAGER_LOADED,
@@ -226,18 +224,22 @@ adsLoader.addEventListener(
 google.ima.AdErrorEvent.Type.AD_ERROR,
 onAdError)
 
+}
+
 adDisplayContainer.initialize()
+
+requestAd()
 
 }
 
 function requestAd(){
 
-let adsRequest=new google.ima.AdsRequest()
+let adsRequest = new google.ima.AdsRequest()
 
-adsRequest.adTagUrl=vastURL()
+adsRequest.adTagUrl = vastURL()
 
-adsRequest.linearAdSlotWidth=window.innerWidth
-adsRequest.linearAdSlotHeight=window.innerHeight
+adsRequest.linearAdSlotWidth = window.innerWidth
+adsRequest.linearAdSlotHeight = window.innerHeight
 
 adsLoader.requestAds(adsRequest)
 
@@ -245,16 +247,15 @@ adsLoader.requestAds(adsRequest)
 
 function vastURL(){
 
-let uid=localStorage.getItem("uid")
+let uid = localStorage.getItem("uid")
 
 if(!uid){
-uid="uid"+Math.floor(Math.random()*999999999)
+uid = "uid"+Math.floor(Math.random()*999999999)
 localStorage.setItem("uid",uid)
 }
 
-let domain=location.hostname
-
-let device=/Android|iPhone/i.test(navigator.userAgent)?"mobile":"desktop"
+let domain = location.hostname
+let device = /Android|iPhone/i.test(navigator.userAgent) ? "mobile" : "desktop"
 
 return "https://ssp.wink.ru/v1/rt/avod/vast?ad_place_type=preroll"
 +"&age_value=18"
@@ -277,16 +278,9 @@ return "https://ssp.wink.ru/v1/rt/avod/vast?ad_place_type=preroll"
 
 function onAdsManagerLoaded(event){
 
-let video=document.getElementById("video")
+let video = document.getElementById("video")
 
-adsManager=event.getAdsManager(video)
-
-adsManager.init(
-window.innerWidth,
-window.innerHeight,
-google.ima.ViewMode.NORMAL)
-
-adsManager.start()
+adsManager = event.getAdsManager(video)
 
 adsManager.addEventListener(
 google.ima.AdEvent.Type.COMPLETE,
@@ -296,23 +290,34 @@ adsManager.addEventListener(
 google.ima.AdEvent.Type.STARTED,
 startTimer)
 
+adsManager.addEventListener(
+google.ima.AdErrorEvent.Type.AD_ERROR,
+onAdError)
+
+adsManager.init(
+window.innerWidth,
+window.innerHeight,
+google.ima.ViewMode.NORMAL)
+
+adsManager.start()
+
 }
 
 function startTimer(){
 
-let timer=document.getElementById("adTimer")
+let timer = document.getElementById("adTimer")
 
 setTimeout(()=>{
 document.getElementById("skipAd").style.display="block"
 },5000)
 
-timerInterval=setInterval(()=>{
+timerInterval = setInterval(()=>{
 
-if(!adsManager)return
+if(!adsManager) return
 
-let remaining=Math.round(adsManager.getRemainingTime())
+let remaining = Math.round(adsManager.getRemainingTime())
 
-timer.innerText="Реклама "+remaining+" сек"
+timer.innerText = "Реклама "+remaining+" сек"
 
 },500)
 
@@ -326,7 +331,7 @@ document.getElementById("skipAd").style.display="none"
 
 adCount++
 
-if(adCount<maxAds){
+if(adCount < maxAds){
 
 requestAd()
 
@@ -342,16 +347,14 @@ autoNextPoster()
 function skipAd(){
 
 if(adsManager){
-
 adsManager.stop()
-
-onAdComplete()
-
 }
 
 }
 
 function onAdError(){
+
+console.log("Ad error")
 
 onAdComplete()
 
@@ -359,25 +362,28 @@ onAdComplete()
 
 function toggleSound(){
 
-let video=document.getElementById("video")
+let video = document.getElementById("video")
 
-video.muted=!video.muted
+video.muted = !video.muted
 
-document.getElementById("muteBtn").innerText=video.muted?"🔇":"🔊"
+document.getElementById("muteBtn").innerText =
+video.muted ? "🔇" : "🔊"
 
 }
 
 function autoNextPoster(){
 
-let posters=document.querySelectorAll(".card")
+let posters = document.querySelectorAll(".card")
 
 currentPoster++
 
-if(currentPoster>=posters.length){
-currentPoster=0
+if(currentPoster >= posters.length){
+currentPoster = 0
 }
 
+setTimeout(()=>{
 posters[currentPoster].click()
+},1000)
 
 }
 
@@ -387,9 +393,11 @@ clearInterval(timerInterval)
 
 document.getElementById("playerModal").style.display="none"
 
+document.getElementById("skipAd").style.display="none"
+
 if(adsManager){
 adsManager.destroy()
-adsManager=null
+adsManager = null
 }
 
 }
