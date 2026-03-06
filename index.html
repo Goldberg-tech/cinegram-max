@@ -76,6 +76,14 @@ width:100%;
 height:auto;
 }
 
+#adContainer{
+position:absolute;
+top:0;
+left:0;
+width:100%;
+height:100%;
+}
+
 .close{
 position:absolute;
 top:20px;
@@ -169,7 +177,7 @@ z-index:9999;
 
 <div id="adText">Просмотр начнется после рекламы</div>
 
-<video id="video" playsinline autoplay></video>
+<video id="video" playsinline webkit-playsinline autoplay muted></video>
 
 <div id="adContainer"></div>
 
@@ -203,7 +211,7 @@ let adContainer = document.getElementById("adContainer")
 
 adContainer.innerHTML=""
 
-/* КРИТИЧЕСКАЯ ЧАСТЬ */
+/* КРИТИЧНО ДЛЯ IMA */
 
 video.muted = true
 video.play().catch(()=>{})
@@ -217,6 +225,11 @@ function startAdRequest(){
 let video = document.getElementById("video")
 let adContainer = document.getElementById("adContainer")
 
+if(adsManager){
+adsManager.destroy()
+adsManager=null
+}
+
 let uid = localStorage.getItem("uid")
 
 if(!uid){
@@ -225,6 +238,7 @@ localStorage.setItem("uid", uid)
 }
 
 let device = /Android|iPhone/i.test(navigator.userAgent) ? "mobile" : "desktop"
+
 let domain = window.location.hostname
 
 let vastUrl =
@@ -248,8 +262,6 @@ let vastUrl =
 
 adDisplayContainer = new google.ima.AdDisplayContainer(adContainer, video)
 
-adDisplayContainer.initialize()
-
 adsLoader = new google.ima.AdsLoader(adDisplayContainer)
 
 adsLoader.addEventListener(
@@ -269,6 +281,8 @@ adsRequest.linearAdSlotWidth = window.innerWidth
 adsRequest.linearAdSlotHeight = window.innerHeight
 
 adsLoader.requestAds(adsRequest)
+
+adDisplayContainer.initialize()
 
 }
 
@@ -358,19 +372,7 @@ function onAdError(error){
 
 console.log("Ad error", error)
 
-/* пытаемся загрузить рекламу заново */
-
-if(adCount < maxAds){
-
-setTimeout(()=>{
-startAdRequest()
-},1000)
-
-}else{
-
 closePlayer()
-
-}
 
 }
 
