@@ -1,76 +1,86 @@
 <!DOCTYPE html>
 <html lang="ru">
 <head>
-<meta charset="UTF-8">
-<title>Telepub Test TMA</title>
-<script src="https://static-adtech.wink.ru/embed-sdk/winkembed.umd.js"></script>
-
-<!-- Яндекс.Метрика -->
-<script type="text/javascript" >
-   (function(m,e,t,r,i,k,a){m[i]=m[i]||function(){(m[i].a=m[i].a||[]).push(arguments)};
-   m[i].l=1*new Date();
-   k=e.createElement(t),a=e.getElementsByTagName(t)[0],k.async=1,k.src=r,a.parentNode.insertBefore(k,a)})
-   (window, document, "script", "https://mc.yandex.ru/metrika/tag.js", "ym");
-
-   ym(106980512, "init", {
-        clickmap:true,
-        trackLinks:true,
-        accurateTrackBounce:true
-   });
-</script>
-<!-- /Яндекс.Метрика -->
-
-<style>
-  body { font-family: Arial, sans-serif; text-align: center; margin: 20px; }
-  #player-container { margin-bottom: 20px; }
-  .btn { display:inline-block; padding:10px 20px; background:#007aff; color:#fff; border-radius:5px; text-decoration:none; font-size:16px; }
-  .btn:hover { background:#005bbb; }
-</style>
+  <meta charset="UTF-8">
+  <title>TMA Wink Direct Ads</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <style>
+    body { font-family: sans-serif; display: flex; flex-direction: column; align-items: center; margin: 20px; }
+    #video-container { width: 100%; max-width: 640px; height: 360px; background: #000; margin-bottom: 20px; position: relative; }
+    .btn { padding: 10px 20px; background: #ff6600; color: #fff; border: none; cursor: pointer; font-size: 16px; border-radius: 5px; margin-top: 10px; }
+  </style>
 </head>
 <body>
 
-<h1>Telepub Test TMA</h1>
+  <h2>Тест прямой рекламы Wink в TMA</h2>
 
-<!-- Контейнер для Wink Embed Player -->
-<div id="player-container"></div>
+  <div id="video-container"></div>
 
-<!-- Кнопка перехода через сокращатель -->
-<a href="https://clck.ru/3S324t" target="_blank" class="btn" id="test-button">Перейти</a>
+  <button class="btn" id="fullscreen-btn">Смотреть на полный экран</button>
+  <button class="btn" id="test-button">Перейти по ссылке</button>
 
-<script>
-  const container = document.getElementById('player-container');
+  <!-- Яндекс.Метрика -->
+  <script type="text/javascript" >
+      (function(m,e,t,r,i,k,a){m[i]=m[i]||function(){(m[i].a=m[i].a||[]).push(arguments)};
+      m[i].l=1*new Date();
+      k=e.createElement(t),a=e.getElementsByTagName(t)[0],k.async=1,k.src=r,a.parentNode.insertBefore(k,a)})
+      (window, document, "script", "https://mc.yandex.ru/metrika/tag.js", "ym");
 
-  // Вставка плеера Wink
-  const frame = WinkEmbedSDK.api.insertFrame(container, {
-    trackId: 149613484,  // твой трек
-    partnerId: 'P0',
-    frameOptions: { width: '640px', height: '360px' }
-  });
+      ym(106980512, "init", {
+          clickmap:true,
+          trackLinks:true,
+          accurateTrackBounce:true
+      });
+  </script>
 
-  const events = WinkEmbedSDK.events;
+  <!-- Wink Embed SDK -->
+  <script src="https://static-adtech.wink.ru/embed-sdk/winkembed.umd.js"></script>
 
-  // Функция для отправки событий в Яндекс.Метрику
-  function ymLogEvent(eventName, payload) {
-      ym(106980512,'reachGoal', eventName, payload);
-      console.log(`Событие отправлено в Метрику: ${eventName}`, payload);
-  }
+  <script>
+    const uid = Math.floor(Math.random() * 1000000000);
+    const domain = "TMA";
+    const container = document.getElementById('video-container');
 
-  // Логирование всех событий плеера
-  frame.on(events.AD_PLAYBACK, (payload) => { ymLogEvent('ad_playback', payload); });
-  frame.on(events.AD_END, (payload) => { ymLogEvent('ad_end', payload); });
-  frame.on(events.AD_SKIP, (payload) => { ymLogEvent('ad_skip', payload); });
-  frame.on(events.AD_REQUEST, (payload) => { ymLogEvent('ad_request', payload); });
-  frame.on(events.ADS_BLOCK_START, (payload) => { ymLogEvent('ads_block_start', payload); });
-  frame.on(events.ADS_BLOCK_END, (payload) => { ymLogEvent('ads_block_end', payload); });
-  frame.on(events.PLAYBACK_START, (payload) => { ymLogEvent('playback_start', payload); });
-  frame.on(events.PLAYBACK_END, (payload) => { ymLogEvent('playback_end', payload); });
+    // Вставляем прямой VAST для рекламы
+    const vastUrl = `https://ssp.wink.ru/v1/rt/avod/vast?ad_place_type=preroll&age_value=18&broadcast_type=ott&client_id=${uid}&client_version=&domain=${domain}&embedded=P5&is_child=false&is_paid=0&location=100001&san=web_vast_code&ad_position=1&device_type=NCWEB&web_client_type=mobile`;
 
-  // Отслеживание клика по кнопке через Яндекс.Метрику с передачей clckid
-  const clckid = '99b4cf91'; // ID ссылки из Кликера
-  document.getElementById('test-button').addEventListener('click', function() {
-      ymLogEvent('click_test_button', { url: this.href, clckid: clckid });
-  });
-</script>
+    const frame = WinkEmbedSDK.api.insertFrame(container, {
+      trackId: null,       // контента нет
+      partnerId: 'P0',     // твой партнерский ID
+      frameOptions: {
+        width: "100%",
+        height: "100%"
+      }
+    });
+
+    const events = WinkEmbedSDK.events;
+
+    // Слушаем все ключевые события VAST
+    frame.on(events.ADS_BLOCK_START, (payload) => { console.log('Начало рекламного блока', payload); });
+    frame.on(events.AD_PLAYBACK, (payload) => { console.log('Показ рекламы', payload); });
+    frame.on(events.AD_END, (payload) => { console.log('Конец рекламы', payload); });
+    frame.on(events.AD_SKIP, (payload) => { console.log('Пропуск рекламы', payload); });
+    frame.on(events.PLAYBACK_START, (payload) => { console.log('Старт сессии просмотра', payload); });
+    frame.on(events.PLAYBACK_END, (payload) => { console.log('Конец сессии', payload); });
+
+    // ===============================
+    // Кнопка перехода в полноэкран
+    // ===============================
+    document.getElementById('fullscreen-btn').addEventListener('click', () => {
+      if (container.requestFullscreen) container.requestFullscreen();
+      else if (container.webkitRequestFullscreen) container.webkitRequestFullscreen();
+      else if (container.msRequestFullscreen) container.msRequestFullscreen();
+    });
+
+    // ===============================
+    // Кнопка перехода по ссылке с Яндекс.Метрикой
+    // ===============================
+    document.getElementById('test-button').addEventListener('click', () => {
+      const redirectUrl = 'https://clck.ru/3S324t';
+      ym(106980512, 'reachGoal', 'click_test_button');
+      window.open(redirectUrl, '_blank');
+    });
+  </script>
 
 </body>
 </html>
