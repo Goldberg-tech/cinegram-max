@@ -188,12 +188,17 @@ function playAd(){
 
 adCount=0
 
-document.getElementById("playerModal").style.display="flex"
+const modal=document.getElementById("playerModal")
+
+modal.style.display="flex"
+
+/* IMPORTANT — задержка WebView gesture lock */
+setTimeout(()=>{
 
 let video=document.getElementById("video")
 
 video.pause()
-video.load()
+video.currentTime=0
 video.muted=true
 
 if(!adDisplayContainer){
@@ -205,7 +210,6 @@ video
 
 }
 
-/* Telegram WebView FIX */
 try{
 adDisplayContainer.initialize()
 }catch(e){
@@ -213,6 +217,8 @@ console.log(e)
 }
 
 startAdRequest()
+
+},100)
 
 }
 
