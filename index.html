@@ -22,7 +22,6 @@ video{width:100%;}
 #skipAd{position:absolute;bottom:20px;right:20px;background:red;border:none;padding:10px 15px;color:white;border-radius:8px;display:none;z-index:9999;}
 #timer{position:absolute;bottom:20px;left:20px;background:rgba(0,0,0,0.6);padding:6px 10px;border-radius:6px;}
 #soundBtn{position:absolute;top:20px;right:20px;background:black;color:white;border:none;padding:8px 12px;border-radius:6px;z-index:9999;}
-#buffering{display:none;font-size:22px;}
 </style>
 </head>
 
@@ -41,7 +40,6 @@ video{width:100%;}
 <div id="playerModal">
 <div class="close" onclick="closePlayer()">×</div>
 <div id="message">Просмотр начнется после рекламы</div>
-<div id="buffering">Загрузка фильма...</div>
 <div id="videoContainer">
 <button id="soundBtn" onclick="toggleSound()">🔊</button>
 <video id="video" playsinline autoplay muted></video>
@@ -61,7 +59,6 @@ const posters=document.querySelectorAll(".card");
 function startCinema(index){
   currentPoster=index;
   document.getElementById("playerModal").style.display="flex";
-  document.getElementById("buffering").style.display="none";
   document.getElementById("message").innerText="Просмотр начнется после рекламы";
   resetAds();
   requestAd();
@@ -70,6 +67,7 @@ function startCinema(index){
 function resetAds(){
   if(adsManager){adsManager.destroy(); adsManager=null;}
   clearInterval(timerInterval);
+  clearTimeout(midrollTimer);
   adIndex=0;
 }
 
@@ -135,24 +133,15 @@ function nextAd(){
   if(adIndex<prerollCount){
     requestAd();
   }else{
-    startBuffer();
+    startContent();
   }
 }
 
 function skipAd(){ nextAd(); }
 
-function startBuffer(){
-  document.getElementById("message").style.display="none";
-  document.getElementById("buffering").style.display="block";
-  setTimeout(()=>{
-    requestAd(); // midroll
-    startContent();
-  },3000);
-}
-
 function startContent(){
-  document.getElementById("buffering").style.display="none";
-  midrollTimer=setTimeout(()=>{ requestAd(); },10000); // midroll
+  // midroll через 10 секунд
+  midrollTimer=setTimeout(()=>{ requestAd(); },10000);
   autoNext();
 }
 
