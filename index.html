@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>TMA Ad Player</title>
+<title>TMA Ad Player Stable</title>
 
 <style>
 html, body {
@@ -12,7 +12,7 @@ html, body {
   background:#000;
   height:100%;
   overflow:hidden;
-  font-family: Arial, sans-serif;
+  font-family: Arial;
 }
 
 video {
@@ -22,22 +22,12 @@ video {
   background:#000;
 }
 
-#clickLayer {
-  position:absolute;
-  top:0;
-  left:0;
-  width:100%;
-  height:100%;
-  cursor:pointer;
-}
-
 #loader {
   position:absolute;
   top:50%;
   left:50%;
   transform:translate(-50%, -50%);
   color:#fff;
-  font-size:18px;
 }
 
 #skipBtn {
@@ -50,6 +40,7 @@ video {
   border-radius:6px;
   display:none;
   cursor:pointer;
+  z-index:10;
 }
 
 #muteBtn {
@@ -61,26 +52,35 @@ video {
   padding:8px 12px;
   border-radius:6px;
   cursor:pointer;
+  z-index:10;
+}
+
+#clickLayer {
+  position:absolute;
+  top:0;
+  left:0;
+  width:100%;
+  height:100%;
 }
 </style>
 </head>
 <body>
 
 <div id="loader">Загрузка рекламы...</div>
-<div id="skipBtn">Пропустить через 5</div>
+<div id="skipBtn">Пропустить</div>
 <div id="muteBtn">🔇</div>
 <div id="clickLayer"></div>
-<video id="adVideo" playsinline muted autoplay></video>
+<video id="adVideo" playsinline muted></video>
 
 <script>
 const tg = window.Telegram?.WebApp;
 if (tg) tg.expand();
 
 const video = document.getElementById("adVideo");
-const clickLayer = document.getElementById("clickLayer");
 const loader = document.getElementById("loader");
 const skipBtn = document.getElementById("skipBtn");
 const muteBtn = document.getElementById("muteBtn");
+const clickLayer = document.getElementById("clickLayer");
 
 let tracking = {};
 let clickThroughUrl = null;
@@ -88,146 +88,101 @@ let quartilesFired = {};
 let skipAvailable = false;
 
 let adQueue = [
-  "VAST_URL_1",
-  "VAST_URL_2"
+  "ВСТАВЬ_СВОЙ_VAST_URL"
 ];
 
 let currentAdIndex = 0;
 
-const deviceId = localStorage.device_id || crypto.randomUUID();
-localStorage.device_id = deviceId;
-
-const POSTBACK_URL = "https://yourtracker.com/postback";
-
-// ================= LOGGING =================
-function logEvent(type, data = {}) {
-
-  console.log("EVENT:", type, data);
-
-  fetch(POSTBACK_URL, {
-    method: "POST",
-    headers: {"Content-Type":"application/json"},
-    body: JSON.stringify({
-      event: type,
-      device_id: deviceId,
-      ad_index: currentAdIndex,
-      timestamp: Date.now(),
-      ...data
-    })
-  }).catch(()=>{});
+// ===== FETCH с timeout =====
+function fetchWithTimeout(url, timeout = 8000) {
+  return Promise.race([
+    fetch(url),
+    new Promise((_, reject) =>
+      setTimeout(() => reject(new Error("Timeout")), timeout)
+    )
+  ]);
 }
 
-// ================= TRACKING =================
-function fireTracking(event) {
-  if (!tracking[event]) return;
-
-  tracking[event].forEach(url => {
-    fetch(url).catch(()=>{});
-  });
-
-  logEvent(event);
-}
-
-// ================= VAST FETCH =================
+// ===== VAST =====
 async function fetchVast(url, depth = 0) {
 
   if (depth > 5) throw new Error("Too many wrappers");
 
-  const res = await fetch(url);
-  const xmlText = await res.text();
-  const xml = new DOMParser().parseFromString(xmlText, "text/xml");
+  const res = await fetchWithTimeout(url);
+  const text = await res.text();
+  const xml = new DOMParser().parseFromString(text, "text/xml");
 
   const wrapper = xml.querySelector("Wrapper VASTAdTagURI");
 
   if (wrapper) {
-    return fetchVast(wrapper.textContent.trim(), depth+1);
+    return fetchVast(wrapper.textContent.trim(), depth + 1);
   }
 
   return xml;
 }
 
+// ===== LOAD AD =====
 async function loadAd() {
 
   loader.style.display = "block";
   skipBtn.style.display = "none";
   skipAvailable = false;
-  quartilesFired = {};
-  tracking = {};
-  clickThroughUrl = null;
 
-  const vastUrl = adQueue[currentAdIndex];
+  try {
 
-  const xml = await fetchVast(vastUrl);
+    const vastUrl = adQueue[currentAdIndex];
 
-  const mediaFile = xml.querySelector("MediaFile");
-  if (!mediaFile) {
-    logEvent("no_media");
+    const xml = await fetchVast(vastUrl);
+
+    const mediaFile = xml.querySelector("MediaFile");
+
+    if (!mediaFile) {
+      console.log("MediaFile not found");
+      playNextAd();
+      return;
+    }
+
+    video.src = mediaFile.textContent.trim();
+    video.load();
+
+    const clickNode = xml.querySelector("ClickThrough");
+    if (clickNode) clickThroughUrl = clickNode.textContent.trim();
+
+    loader.style.display = "none";
+
+    await video.play();
+
+  } catch (err) {
+
+    console.error("LOAD ERROR:", err);
+    loader.style.display = "none";
     playNextAd();
-    return;
+
   }
-
-  video.src = mediaFile.textContent.trim();
-
-  xml.querySelectorAll("Tracking").forEach(node => {
-    const event = node.getAttribute("event");
-    if (!tracking[event]) tracking[event] = [];
-    tracking[event].push(node.textContent.trim());
-  });
-
-  const impression = xml.querySelector("Impression");
-  if (impression) tracking.impression = [impression.textContent.trim()];
-
-  const clickNode = xml.querySelector("ClickThrough");
-  if (clickNode) clickThroughUrl = clickNode.textContent.trim();
-
-  loader.style.display = "none";
-
-  video.play();
-  logEvent("ad_loaded");
 }
 
-// ================= VIDEO EVENTS =================
-video.addEventListener("play", () => {
-  fireTracking("impression");
-  fireTracking("start");
-  logEvent("play");
-});
-
+// ===== VIDEO EVENTS =====
 video.addEventListener("timeupdate", () => {
 
   if (!video.duration) return;
 
-  const progress = video.currentTime / video.duration;
-
   if (video.currentTime >= 5 && !skipAvailable) {
     skipAvailable = true;
     skipBtn.style.display = "block";
-    skipBtn.innerText = "Пропустить";
   }
 
-  if (progress >= 0.25 && !quartilesFired.q1) {
-    quartilesFired.q1 = true;
-    fireTracking("firstQuartile");
-  }
-
-  if (progress >= 0.5 && !quartilesFired.q2) {
-    quartilesFired.q2 = true;
-    fireTracking("midpoint");
-  }
-
-  if (progress >= 0.75 && !quartilesFired.q3) {
-    quartilesFired.q3 = true;
-    fireTracking("thirdQuartile");
-  }
 });
 
 video.addEventListener("ended", () => {
-  fireTracking("complete");
-  logEvent("complete");
   playNextAd();
 });
 
-// ================= NEXT AD =================
+video.addEventListener("error", () => {
+  console.log("Video error");
+  playNextAd();
+});
+
+// ===== NEXT AD =====
 function playNextAd() {
 
   currentAdIndex++;
@@ -235,32 +190,25 @@ function playNextAd() {
   if (currentAdIndex < adQueue.length) {
     loadAd();
   } else {
-    logEvent("ad_pod_finished");
-    console.log("Все ролики завершены");
+    loader.innerText = "Реклама завершена";
+    loader.style.display = "block";
   }
 }
 
-// ================= SKIP =================
+// ===== SKIP =====
 skipBtn.addEventListener("click", () => {
-  logEvent("skip");
   playNextAd();
 });
 
-// ================= MUTE =================
+// ===== MUTE =====
 muteBtn.addEventListener("click", () => {
-
   video.muted = !video.muted;
   muteBtn.innerText = video.muted ? "🔇" : "🔊";
-  logEvent(video.muted ? "muted" : "unmuted");
 });
 
-// ================= CLICK =================
+// ===== CLICK =====
 clickLayer.addEventListener("click", () => {
-
   if (!clickThroughUrl) return;
-
-  fireTracking("click");
-  logEvent("click", {url: clickThroughUrl});
 
   if (tg) {
     tg.openLink(clickThroughUrl);
@@ -269,7 +217,7 @@ clickLayer.addEventListener("click", () => {
   }
 });
 
-// ================= START =================
+// START
 loadAd();
 
 </script>
