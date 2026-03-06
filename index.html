@@ -2,85 +2,73 @@
 <html lang="ru">
 <head>
   <meta charset="UTF-8">
-  <title>TMA Wink Direct Ads</title>
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>TMA Wink VAST Mobile Test</title>
   <style>
-    body { font-family: sans-serif; display: flex; flex-direction: column; align-items: center; margin: 20px; }
-    #video-container { width: 100%; max-width: 640px; height: 360px; background: #000; margin-bottom: 20px; position: relative; }
-    .btn { padding: 10px 20px; background: #ff6600; color: #fff; border: none; cursor: pointer; font-size: 16px; border-radius: 5px; margin-top: 10px; }
+    body, html {
+      margin: 0; padding: 0;
+      width: 100%; height: 100%;
+      display: flex; justify-content: center; align-items: center;
+      background: #000;
+    }
+    #player-container {
+      width: 360px;
+      height: 640px;
+      position: relative;
+    }
+    #fullscreen-btn {
+      position: absolute;
+      bottom: 10px;
+      right: 10px;
+      padding: 6px 12px;
+      background: rgba(255,255,255,0.8);
+      border: none;
+      border-radius: 4px;
+      cursor: pointer;
+      font-weight: bold;
+    }
   </style>
 </head>
 <body>
 
-  <h2>Тест прямой рекламы Wink в TMA</h2>
+<div id="player-container"></div>
+<button id="fullscreen-btn">FullScreen</button>
 
-  <div id="video-container"></div>
+<!-- Wink Embed SDK -->
+<script src="https://static-adtech.wink.ru/embed-sdk/winkembed.umd.js"></script>
+<script>
+  const container = document.getElementById('player-container');
 
-  <button class="btn" id="fullscreen-btn">Смотреть на полный экран</button>
-  <button class="btn" id="test-button">Перейти по ссылке</button>
+  // Вставляем плеер Wink
+  const frame = WinkEmbedSDK.api.insertFrame(container, {
+    trackId: 23080,       // TrackId рекламного блока (preroll)
+    partnerId: 'P0',      // твой Partner ID
+    frameOptions: {
+      width: "360px",
+      height: "640px"
+    }
+  });
 
-  <!-- Яндекс.Метрика -->
-  <script type="text/javascript" >
-      (function(m,e,t,r,i,k,a){m[i]=m[i]||function(){(m[i].a=m[i].a||[]).push(arguments)};
-      m[i].l=1*new Date();
-      k=e.createElement(t),a=e.getElementsByTagName(t)[0],k.async=1,k.src=r,a.parentNode.insertBefore(k,a)})
-      (window, document, "script", "https://mc.yandex.ru/metrika/tag.js", "ym");
+  // Кнопка FullScreen
+  const btn = document.getElementById('fullscreen-btn');
+  btn.addEventListener('click', () => {
+    if (container.requestFullscreen) {
+      container.requestFullscreen();
+    } else if (container.webkitRequestFullscreen) { /* Safari */
+      container.webkitRequestFullscreen();
+    } else if (container.msRequestFullscreen) { /* IE11 */
+      container.msRequestFullscreen();
+    }
+  });
 
-      ym(106980512, "init", {
-          clickmap:true,
-          trackLinks:true,
-          accurateTrackBounce:true
-      });
-  </script>
-
-  <!-- Wink Embed SDK -->
-  <script src="https://static-adtech.wink.ru/embed-sdk/winkembed.umd.js"></script>
-
-  <script>
-    const uid = Math.floor(Math.random() * 1000000000);
-    const domain = "TMA";
-    const container = document.getElementById('video-container');
-
-    // Вставляем прямой VAST для рекламы
-    const vastUrl = `https://ssp.wink.ru/v1/rt/avod/vast?ad_place_type=preroll&age_value=18&broadcast_type=ott&client_id=${uid}&client_version=&domain=${domain}&embedded=P5&is_child=false&is_paid=0&location=100001&san=web_vast_code&ad_position=1&device_type=NCWEB&web_client_type=mobile`;
-
-    const frame = WinkEmbedSDK.api.insertFrame(container, {
-      trackId: null,       // контента нет
-      partnerId: 'P0',     // твой партнерский ID
-      frameOptions: {
-        width: "100%",
-        height: "100%"
-      }
-    });
-
-    const events = WinkEmbedSDK.events;
-
-    // Слушаем все ключевые события VAST
-    frame.on(events.ADS_BLOCK_START, (payload) => { console.log('Начало рекламного блока', payload); });
-    frame.on(events.AD_PLAYBACK, (payload) => { console.log('Показ рекламы', payload); });
-    frame.on(events.AD_END, (payload) => { console.log('Конец рекламы', payload); });
-    frame.on(events.AD_SKIP, (payload) => { console.log('Пропуск рекламы', payload); });
-    frame.on(events.PLAYBACK_START, (payload) => { console.log('Старт сессии просмотра', payload); });
-    frame.on(events.PLAYBACK_END, (payload) => { console.log('Конец сессии', payload); });
-
-    // ===============================
-    // Кнопка перехода в полноэкран
-    // ===============================
-    document.getElementById('fullscreen-btn').addEventListener('click', () => {
-      if (container.requestFullscreen) container.requestFullscreen();
-      else if (container.webkitRequestFullscreen) container.webkitRequestFullscreen();
-      else if (container.msRequestFullscreen) container.msRequestFullscreen();
-    });
-
-    // ===============================
-    // Кнопка перехода по ссылке с Яндекс.Метрикой
-    // ===============================
-    document.getElementById('test-button').addEventListener('click', () => {
-      const redirectUrl = 'https://clck.ru/3S324t';
-      ym(106980512, 'reachGoal', 'click_test_button');
-      window.open(redirectUrl, '_blank');
-    });
-  </script>
+  // Пример логирования событий рекламы
+  const { events } = WinkEmbedSDK;
+  frame.on(events.PLAYBACK_START, (payload) => {
+    console.log('Видео стартовало:', payload);
+  });
+  frame.on(events.AD_END, (payload) => {
+    console.log('Реклама закончилась:', payload);
+  });
+</script>
 
 </body>
 </html>
