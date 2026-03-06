@@ -67,8 +67,8 @@ z-index:9999;
 }
 
 #adText{
-text-align:center;
 padding:15px;
+text-align:center;
 background:#111;
 width:100%;
 }
@@ -140,17 +140,17 @@ z-index:9999;
 
 <div class="vitrina">
 
-<div class="card" onclick="playAd(0)">
+<div class="card" onclick="playAd()">
 <img src="posters/molodezhka.jpg">
 <div class="title">Молодежка</div>
 </div>
 
-<div class="card" onclick="playAd(1)">
+<div class="card" onclick="playAd()">
 <img src="posters/kuhnya.jpg">
 <div class="title">Кухня</div>
 </div>
 
-<div class="card" onclick="playAd(2)">
+<div class="card" onclick="playAd()">
 <img src="posters/grand.jpg">
 <div class="title">Гранд</div>
 </div>
@@ -188,14 +188,22 @@ let adsManager
 let adCount=0
 let maxAds=3
 
-let posters=document.querySelectorAll(".card")
-let currentPosterIndex=0
-
 let timerInterval
-let soundEnabled=true
 
-const video=document.getElementById("video")
-const adContainer=document.getElementById("adContainer")
+let video=document.getElementById("video")
+let adContainer=document.getElementById("adContainer")
+
+let soundEnabled=true
+let playerClosed=false
+
+function playAd(){
+
+playerClosed=false
+adCount=0
+
+document.getElementById("playerModal").style.display="flex"
+
+video.load()
 
 adDisplayContainer=new google.ima.AdDisplayContainer(adContainer,video)
 
@@ -203,20 +211,13 @@ adsLoader=new google.ima.AdsLoader(adDisplayContainer)
 
 adsLoader.addEventListener(
 google.ima.AdsManagerLoadedEvent.Type.ADS_MANAGER_LOADED,
-onAdsManagerLoaded
-)
+onAdsManagerLoaded,
+false)
 
 adsLoader.addEventListener(
 google.ima.AdErrorEvent.Type.AD_ERROR,
-onAdError
-)
-
-function playAd(index){
-
-currentPosterIndex=index
-adCount=0
-
-document.getElementById("playerModal").style.display="flex"
+onAdError,
+false)
 
 adDisplayContainer.initialize()
 
@@ -225,6 +226,8 @@ requestAd()
 }
 
 function requestAd(){
+
+if(playerClosed) return
 
 let uid=localStorage.getItem("uid")
 
@@ -256,11 +259,15 @@ adsLoader.requestAds(adsRequest)
 
 function onAdsManagerLoaded(event){
 
-if(adsManager){
-adsManager.destroy()
-}
-
 adsManager=event.getAdsManager(video)
+
+adsManager.init(
+window.innerWidth,
+window.innerHeight,
+google.ima.ViewMode.NORMAL
+)
+
+adsManager.start()
 
 adsManager.addEventListener(
 google.ima.AdEvent.Type.COMPLETE,
@@ -272,14 +279,6 @@ google.ima.AdEvent.Type.STARTED,
 startTimer
 )
 
-adsManager.init(
-window.innerWidth,
-window.innerHeight,
-google.ima.ViewMode.NORMAL
-)
-
-adsManager.start()
-
 }
 
 function startTimer(){
@@ -290,13 +289,11 @@ document.getElementById("skipAd").style.display="block"
 
 timerInterval=setInterval(()=>{
 
+if(!adsManager) return
+
 let remaining=Math.round(adsManager.getRemainingTime())
 
 document.getElementById("adTimer").innerText="Реклама "+remaining+" сек"
-
-if(remaining<=0){
-clearInterval(timerInterval)
-}
 
 },500)
 
@@ -316,7 +313,7 @@ requestAd()
 
 }else{
 
-goNextPoster()
+closePlayer()
 
 }
 
@@ -345,31 +342,24 @@ function onAdError(e){
 
 console.log("Ad error",e)
 
-goNextPoster()
+closePlayer()
 
 }
 
 function closePlayer(){
 
-document.getElementById("playerModal").style.display="none"
+playerClosed=true
 
-if(adsManager){
-adsManager.destroy()
-}
+document.getElementById("playerModal").style.display="none"
 
 clearInterval(timerInterval)
 
+document.getElementById("skipAd").style.display="none"
+
+if(adsManager){
+adsManager.destroy()
+adsManager=null
 }
-
-function goNextPoster(){
-
-currentPosterIndex++
-
-if(currentPosterIndex>=posters.length){
-currentPosterIndex=0
-}
-
-playAd(currentPosterIndex)
 
 }
 
