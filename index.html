@@ -63,6 +63,12 @@ display:none;
 align-items:center;
 justify-content:center;
 z-index:9999;
+flex-direction:column;
+}
+
+#message{
+margin-bottom:10px;
+font-size:18px;
 }
 
 #videoContainer{
@@ -73,7 +79,6 @@ position:relative;
 
 video{
 width:100%;
-height:auto;
 }
 
 .close{
@@ -85,38 +90,43 @@ cursor:pointer;
 z-index:10000;
 }
 
-#adText{
-position:absolute;
-top:20px;
-left:20px;
-background:rgba(0,0,0,0.6);
-padding:10px 15px;
-border-radius:10px;
-z-index:9999;
-}
-
-#adTimer{
-position:absolute;
-bottom:20px;
-left:20px;
-background:rgba(0,0,0,0.6);
-padding:8px 12px;
-border-radius:8px;
-font-size:14px;
-z-index:9999;
-}
-
 #skipAd{
 position:absolute;
 bottom:20px;
 right:20px;
-background:#ff0000;
+background:red;
 border:none;
-padding:10px 16px;
+padding:10px 15px;
 color:white;
 border-radius:8px;
 display:none;
 z-index:9999;
+}
+
+#timer{
+position:absolute;
+bottom:20px;
+left:20px;
+background:rgba(0,0,0,0.6);
+padding:6px 10px;
+border-radius:6px;
+}
+
+#soundBtn{
+position:absolute;
+top:20px;
+right:20px;
+background:black;
+color:white;
+border:none;
+padding:8px 12px;
+border-radius:6px;
+z-index:9999;
+}
+
+#buffering{
+display:none;
+font-size:22px;
 }
 
 </style>
@@ -129,32 +139,32 @@ z-index:9999;
 
 <div class="vitrina">
 
-<div class="card" onclick="playAd()">
+<div class="card" onclick="startCinema(0)">
 <img src="posters/molodezhka.jpg">
 <div class="title">Молодежка</div>
 </div>
 
-<div class="card" onclick="playAd()">
+<div class="card" onclick="startCinema(1)">
 <img src="posters/kuhnya.jpg">
 <div class="title">Кухня</div>
 </div>
 
-<div class="card" onclick="playAd()">
+<div class="card" onclick="startCinema(2)">
 <img src="posters/grand.jpg">
 <div class="title">Гранд</div>
 </div>
 
-<div class="card" onclick="playAd()">
+<div class="card" onclick="startCinema(3)">
 <img src="posters/deti-peremen.jpg">
 <div class="title">Дети перемен</div>
 </div>
 
-<div class="card" onclick="playAd()">
+<div class="card" onclick="startCinema(4)">
 <img src="posters/slovo-pacana.jpg">
 <div class="title">Слово пацана</div>
 </div>
 
-<div class="card" onclick="playAd()">
+<div class="card" onclick="startCinema(5)">
 <img src="posters/obnalshik.jpg">
 <div class="title">Обнальщик</div>
 </div>
@@ -165,15 +175,19 @@ z-index:9999;
 
 <div class="close" onclick="closePlayer()">×</div>
 
+<div id="message">Просмотр начнется после рекламы</div>
+
+<div id="buffering">Загрузка фильма...</div>
+
 <div id="videoContainer">
 
-<div id="adText">Просмотр начнется после рекламы</div>
+<button id="soundBtn" onclick="toggleSound()">🔊</button>
 
 <video id="video" playsinline autoplay></video>
 
 <div id="adContainer"></div>
 
-<div id="adTimer"></div>
+<div id="timer"></div>
 
 <button id="skipAd" onclick="skipAd()">Пропустить</button>
 
@@ -183,84 +197,99 @@ z-index:9999;
 
 <script>
 
-let adDisplayContainer
 let adsLoader
 let adsManager
+let adDisplayContainer
 
-let adCount = 0
-let maxAds = 3
+let adIndex = 0
+let prerollCount = 3
+
+let currentPoster = 0
 
 let timerInterval
+let midrollTimer
 
-function playAd(){
+const posters = document.querySelectorAll(".card")
 
-adCount = 0
+function startCinema(index){
+
+currentPoster=index
 
 document.getElementById("playerModal").style.display="flex"
+document.getElementById("buffering").style.display="none"
+document.getElementById("message").innerText="Просмотр начнется после рекламы"
 
-let video = document.getElementById("video")
-let adContainer = document.getElementById("adContainer")
+resetAds()
 
-adContainer.innerHTML=""
-
-startAdRequest()
+requestAd()
 
 }
 
-function startAdRequest(){
+function resetAds(){
 
-let video = document.getElementById("video")
-let adContainer = document.getElementById("adContainer")
+if(adsManager){
 
-let uid = localStorage.getItem("uid")
+adsManager.destroy()
+adsManager=null
+
+}
+
+clearInterval(timerInterval)
+
+adIndex=0
+
+}
+
+function requestAd(){
+
+let video=document.getElementById("video")
+let adContainer=document.getElementById("adContainer")
+
+let uid=localStorage.getItem("uid")
 
 if(!uid){
-uid = "uid"+Math.floor(Math.random()*999999999)
-localStorage.setItem("uid", uid)
+
+uid="uid"+Math.floor(Math.random()*999999999)
+
+localStorage.setItem("uid",uid)
+
 }
 
-let device = /Android|iPhone/i.test(navigator.userAgent) ? "mobile" : "desktop"
+let device=/Android|iPhone/i.test(navigator.userAgent)?"mobile":"desktop"
 
-let domain = window.location.hostname
+let domain=window.location.hostname
 
-let vastUrl =
+let vastUrl=
 "https://ssp.wink.ru/v1/rt/avod/vast?ad_place_type=preroll"
 +"&age_value=18"
 +"&broadcast_type=ott"
 +"&client_id="+uid
-+"&client_version="
 +"&domain="+domain
-+"&embedded=P5"
-+"&is_child=false"
-+"&is_paid=0"
-+"&location=100001"
-+"&san=web_vast_code"
-+"&ad_position=1"
-+"&content_id=23080"
 +"&device_type=NCWEB"
 +"&web_client_type="+device
 +"&cb="+Date.now()
-+"&rnd="+Math.floor(Math.random()*1000000000)
++"&rnd="+Math.floor(Math.random()*9999999)
 
-adDisplayContainer = new google.ima.AdDisplayContainer(adContainer, video)
+adDisplayContainer=new google.ima.AdDisplayContainer(adContainer,video)
 
-adsLoader = new google.ima.AdsLoader(adDisplayContainer)
+adsLoader=new google.ima.AdsLoader(adDisplayContainer)
 
 adsLoader.addEventListener(
 google.ima.AdsManagerLoadedEvent.Type.ADS_MANAGER_LOADED,
-onAdsManagerLoaded,
-false)
+onAdsManagerLoaded
+)
 
 adsLoader.addEventListener(
 google.ima.AdErrorEvent.Type.AD_ERROR,
-onAdError,
-false)
+onAdError
+)
 
-let adsRequest = new google.ima.AdsRequest()
+let adsRequest=new google.ima.AdsRequest()
 
-adsRequest.adTagUrl = vastUrl
-adsRequest.linearAdSlotWidth = window.innerWidth
-adsRequest.linearAdSlotHeight = window.innerHeight
+adsRequest.adTagUrl=vastUrl
+
+adsRequest.linearAdSlotWidth=window.innerWidth
+adsRequest.linearAdSlotHeight=window.innerHeight
 
 adsLoader.requestAds(adsRequest)
 
@@ -270,53 +299,29 @@ adDisplayContainer.initialize()
 
 function onAdsManagerLoaded(event){
 
-let video = document.getElementById("video")
+let video=document.getElementById("video")
 
-adsManager = event.getAdsManager(video)
+adsManager=event.getAdsManager(video)
 
-adsManager.init(
-window.innerWidth,
-window.innerHeight,
-google.ima.ViewMode.NORMAL
-)
+adsManager.init(window.innerWidth,window.innerHeight,google.ima.ViewMode.NORMAL)
 
 adsManager.start()
 
 adsManager.addEventListener(
 google.ima.AdEvent.Type.COMPLETE,
-onAdComplete
+nextAd
 )
 
 adsManager.addEventListener(
 google.ima.AdEvent.Type.STARTED,
-startAdTimer
+startTimer
 )
 
 }
 
-function onAdComplete(){
+function startTimer(){
 
-clearInterval(timerInterval)
-
-document.getElementById("skipAd").style.display="none"
-
-adCount++
-
-if(adCount < maxAds){
-
-startAdRequest()
-
-}else{
-
-closePlayer()
-
-}
-
-}
-
-function startAdTimer(){
-
-let timer = document.getElementById("adTimer")
+let timer=document.getElementById("timer")
 
 setTimeout(()=>{
 
@@ -324,15 +329,15 @@ document.getElementById("skipAd").style.display="block"
 
 },5000)
 
-timerInterval = setInterval(()=>{
+timerInterval=setInterval(()=>{
 
-if(!adsManager) return
+if(!adsManager)return
 
-let remaining = Math.round(adsManager.getRemainingTime())
+let remain=Math.round(adsManager.getRemainingTime())
 
-timer.innerText = "Реклама: "+remaining+" сек"
+timer.innerText="Реклама: "+remain+" сек"
 
-if(remaining <= 0){
+if(remain<=0){
 
 clearInterval(timerInterval)
 
@@ -342,21 +347,91 @@ clearInterval(timerInterval)
 
 }
 
+function nextAd(){
+
+clearInterval(timerInterval)
+
+document.getElementById("skipAd").style.display="none"
+
+adIndex++
+
+if(adIndex<prerollCount){
+
+requestAd()
+
+}else{
+
+startBuffer()
+
+}
+
+}
+
 function skipAd(){
 
-if(adsManager){
-
-adsManager.stop()
+nextAd()
 
 }
 
+function startBuffer(){
+
+document.getElementById("message").style.display="none"
+
+document.getElementById("buffering").style.display="block"
+
+setTimeout(()=>{
+
+requestAd()
+
+startContent()
+
+},3000)
+
 }
 
-function onAdError(error){
+function startContent(){
 
-console.log("Ad error", error)
+document.getElementById("buffering").style.display="none"
 
-closePlayer()
+midrollTimer=setTimeout(()=>{
+
+requestAd()
+
+},10000)
+
+autoNext()
+
+}
+
+function autoNext(){
+
+setTimeout(()=>{
+
+currentPoster++
+
+if(currentPoster>=posters.length){
+
+currentPoster=0
+
+}
+
+startCinema(currentPoster)
+
+},20000)
+
+}
+
+function toggleSound(){
+
+let video=document.getElementById("video")
+
+video.muted=!video.muted
+
+}
+
+function onAdError(){
+
+nextAd()
 
 }
 
@@ -364,14 +439,7 @@ function closePlayer(){
 
 document.getElementById("playerModal").style.display="none"
 
-clearInterval(timerInterval)
-
-document.getElementById("skipAd").style.display="none"
-
-if(adsManager){
-adsManager.destroy()
-adsManager = null
-}
+resetAds()
 
 }
 
