@@ -1,315 +1,169 @@
 <!DOCTYPE html>
-<html>
+<html lang="ru">
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>TMA Ad Engine</title>
+<title>Telepub Player</title>
 
 <style>
-html,body{
-    margin:0;
-    padding:0;
-    background:#000;
-    height:100%;
-    overflow:hidden;
-    font-family:Arial;
-}
+  body {
+    margin: 0;
+    font-family: sans-serif;
+    background: black;
+    text-align: center;
+    color: white;
+  }
 
-video{
-    width:100%;
-    height:100%;
-    object-fit:contain;
-    background:#000;
-}
+  #wink-player {
+    width: 100%;
+    max-width: 900px;
+    margin: 0 auto;
+  }
 
-#loader{
-    position:absolute;
-    top:50%;
-    left:50%;
-    transform:translate(-50%,-50%);
-    color:white;
-}
+  iframe {
+    width: 100%;
+    height: 360px;
+    border: none;
+  }
 
-#skipBtn{
-    position:absolute;
-    top:20px;
-    right:20px;
-    background:rgba(0,0,0,.6);
-    color:white;
-    padding:8px 14px;
-    border-radius:6px;
-    display:none;
-    cursor:pointer;
-    z-index:10;
-}
+  .controls {
+    margin-top: 10px;
+  }
 
-#muteBtn{
-    position:absolute;
-    bottom:20px;
-    right:20px;
-    background:rgba(0,0,0,.6);
-    color:white;
-    padding:8px 14px;
-    border-radius:6px;
-    cursor:pointer;
-    z-index:10;
-}
+  button, a {
+    padding: 12px 20px;
+    font-size: 16px;
+    border-radius: 8px;
+    border: none;
+    text-decoration: none;
+    cursor: pointer;
+  }
 
-#clickLayer{
-    position:absolute;
-    top:0;
-    left:0;
-    width:100%;
-    height:100%;
-}
+  .buy {
+    background: #ff3b30;
+    color: white;
+  }
+
+  .fullscreen {
+    background: #333;
+    color: white;
+    margin-left: 10px;
+  }
+
+  /* fullscreen поведение */
+  #wink-player:fullscreen iframe {
+    height: 100vh;
+  }
 </style>
 </head>
 
 <body>
 
-<div id="loader">Загрузка рекламы...</div>
-<div id="skipBtn">Пропустить</div>
-<div id="muteBtn">🔇</div>
-<div id="clickLayer"></div>
+<h3>Telepub — просмотр</h3>
 
-<video id="adVideo" playsinline muted autoplay></video>
+<div id="wink-player"></div>
+
+<div class="controls">
+  <a class="buy"
+     href="https://brand-sense.github.io/tma_traffic_test/?utm_source=telegram&utm_medium=miniapp&utm_campaign=test_tma&utm_content=btn1"
+     target="_blank">
+    Купить
+  </a>
+
+  <button class="fullscreen" onclick="openFullscreen()">⛶ Развернуть</button>
+</div>
+
+<script src="https://static-adtech.wink.ru/embed-sdk/winkembed.umd.js"></script>
 
 <script>
+  const container = document.getElementById("wink-player");
 
-const tg = window.Telegram?.WebApp;
-if(tg) tg.expand();
+  const frame = WinkEmbedSDK.api.insertFrame(container, {
+    trackId: 149613484,
+    partnerId: 'P0',
+    frameOptions: {
+      width: "100%",
+      height: "360px",
+      allowFullscreen: true
+    }
+  });
 
-const video = document.getElementById("adVideo");
-const loader = document.getElementById("loader");
-const skipBtn = document.getElementById("skipBtn");
-const muteBtn = document.getElementById("muteBtn");
-const clickLayer = document.getElementById("clickLayer");
+  const { events } = WinkEmbedSDK;
 
-let tracking = {};
-let clickThroughUrl = null;
-let quartilesFired = {};
-let skipAvailable = false;
+  // =========================
+  // 🚀 AUTO FULLSCREEN
+  // =========================
+  function openFullscreen() {
+    if (container.requestFullscreen) {
+      container.requestFullscreen();
+    } else if (container.webkitRequestFullscreen) {
+      container.webkitRequestFullscreen();
+    }
 
-// ================= CONFIG =================
+    // попытка повернуть экран
+    if (screen.orientation && screen.orientation.lock) {
+      screen.orientation.lock('landscape').catch(() => {});
+    }
+  }
 
-const POSTBACK_URL = "https://your-postback-endpoint.com/postback";
+  // автозапуск fullscreen при старте видео
+  frame.on(events.PLAYBACK_START, () => {
+    console.log("▶️ Видео началось");
 
-const deviceId = localStorage.device_id ||
-                 (localStorage.device_id = crypto.randomUUID());
+    openFullscreen();
+    sendEvent("playback_start");
+  });
 
-const domain = location.hostname;
+  // =========================
+  // 📊 ТРЕКИНГ (AdFox / метрика)
+  // =========================
 
-// ===== VAST SOURCE (ОБЯЗАТЕЛЬНО ЗАМЕНИ) =====
+  function sendEvent(name, data = {}) {
+    console.log("TRACK:", name, data);
 
-const VAST_URL = "PUT_YOUR_VAST_HERE";
+    // пример — можно отправлять в метрику
+    if (window.ym) {
+      ym(XXXXXX, 'reachGoal', name, data); // вставь ID метрики
+    }
 
-// ================= LOGGING =================
+    // или пиксель
+    /*
+    fetch(`https://your-tracker.com/event?e=${name}`);
+    */
+  }
 
-function logEvent(event,data={}){
-
-    try{
-
-        fetch(POSTBACK_URL,{
-            method:"POST",
-            headers:{ "Content-Type":"application/json" },
-            body:JSON.stringify({
-                event,
-                device_id:deviceId,
-                timestamp:Date.now(),
-                ...data
-            })
-        }).catch(()=>{});
-
-    }catch(e){}
-
-}
-
-// ================= TRACKING =================
-
-function fireTracking(event){
-
-    if(!tracking[event]) return;
-
-    tracking[event].forEach(url=>{
-        fetch(url).catch(()=>{});
+  frame.on(events.AD_PLAYBACK, ({ ad_place_type, ad_position }) => {
+    sendEvent("ad_impression", {
+      type: ad_place_type,
+      pos: ad_position
     });
+  });
 
-    logEvent(event);
+  frame.on(events.AD_END, ({ ad_place_type, ad_position }) => {
+    sendEvent("ad_end", {
+      type: ad_place_type,
+      pos: ad_position
+    });
+  });
 
-}
+  frame.on(events.AD_SKIP, () => {
+    sendEvent("ad_skip");
+  });
 
-// ================= FETCH WITH TIMEOUT =================
+  frame.on(events.AD_ERROR, () => {
+    sendEvent("ad_error");
+  });
 
-function fetchTimeout(url,timeout=8000){
+  frame.on(events.PLAYBACK_END, () => {
+    sendEvent("content_end");
+  });
 
-    return Promise.race([
-        fetch(url),
-        new Promise((_,rej)=>setTimeout(()=>rej("timeout"),timeout))
-    ]);
-
-}
-
-// ================= WRAPPER RESOLVER =================
-
-async function fetchVast(url,depth=0){
-
-    if(depth>5) throw "wrapper depth";
-
-    const res = await fetchTimeout(url);
-
-    const text = await res.text();
-
-    const xml = new DOMParser().parseFromString(text,"text/xml");
-
-    const wrapper = xml.querySelector("Wrapper VASTAdTagURI");
-
-    if(wrapper){
-        return fetchVast(wrapper.textContent.trim(),depth+1);
-    }
-
-    return xml;
-}
-
-// ================= FINISH FLOW =================
-
-function finishAdFlow(){
-
-    video.pause();
-    video.currentTime = 0;
-
-    quartilesFired = {};
-    skipAvailable = false;
-
-    skipBtn.style.display="none";
-
-    loader.style.display="block";
-    loader.innerText="Загрузка рекламы...";
-
-    setTimeout(()=>{
-        loadVast();
-    },300);
-}
-
-// ================= LOAD VAST =================
-
-async function loadVast(){
-
-    try{
-
-        const xml = await fetchVast(VAST_URL);
-
-        const mediaFile = xml.querySelector("MediaFile");
-
-        if(!mediaFile){
-            loader.innerText="Реклама завершена";
-            return;
-        }
-
-        video.src = mediaFile.textContent.trim();
-        video.load();
-
-        tracking = {};
-        clickThroughUrl = null;
-
-        xml.querySelectorAll("Tracking").forEach(node=>{
-            const ev = node.getAttribute("event");
-            if(!tracking[ev]) tracking[ev]=[];
-            tracking[ev].push(node.textContent.trim());
-        });
-
-        const imp = xml.querySelector("Impression");
-        if(imp) tracking.impression=[imp.textContent.trim()];
-
-        const clickNode = xml.querySelector("ClickThrough");
-        if(clickNode) clickThroughUrl = clickNode.textContent.trim();
-
-        loader.style.display="none";
-
-        video.muted=true;
-
-        try{
-            await video.play();
-        }catch(e){
-            console.log("Autoplay recovery");
-        }
-
-    }catch(e){
-
-        console.log(e);
-        loader.innerText="Ошибка загрузки рекламы";
-
-    }
-}
-
-// ================= VIDEO EVENTS =================
-
-video.addEventListener("play",()=>{
-    fireTracking("impression");
-    fireTracking("start");
-});
-
-video.addEventListener("timeupdate",()=>{
-
-    if(!video.duration) return;
-
-    const p = video.currentTime / video.duration;
-
-    if(video.currentTime>=5 && !skipAvailable){
-        skipAvailable=true;
-        skipBtn.style.display="block";
-    }
-
-    if(p>=0.25 && !quartilesFired.q1){
-        quartilesFired.q1=true;
-        fireTracking("firstQuartile");
-    }
-
-    if(p>=0.5 && !quartilesFired.q2){
-        quartilesFired.q2=true;
-        fireTracking("midpoint");
-    }
-
-    if(p>=0.75 && !quartilesFired.q3){
-        quartilesFired.q3=true;
-        fireTracking("thirdQuartile");
-    }
-
-});
-
-video.addEventListener("ended",()=>{
-    fireTracking("complete");
-    finishAdFlow();
-});
-
-// ================= CONTROLS =================
-
-skipBtn.onclick=()=>{
-    fireTracking("skip");
-    finishAdFlow();
-};
-
-muteBtn.onclick=()=>{
-    video.muted=!video.muted;
-    muteBtn.innerText = video.muted ? "🔇" : "🔊";
-};
-
-// ================= CLICK =================
-
-clickLayer.onclick=()=>{
-
-    if(!clickThroughUrl) return;
-
-    fireTracking("click");
-    logEvent("click",{url:clickThroughUrl});
-
-    if(tg) tg.openLink(clickThroughUrl);
-    else window.open(clickThroughUrl,"_blank");
-
-};
-
-// ================= START =================
-
-loadVast();
+  // =========================
+  // fallback — клик = fullscreen
+  // =========================
+  container.addEventListener("click", () => {
+    openFullscreen();
+  });
 
 </script>
 
