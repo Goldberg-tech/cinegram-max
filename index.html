@@ -191,14 +191,10 @@ z-index:9999;
 
 <script>
 
-let adDisplayContainer
-let adsLoader
-let adsManager
-
 let adCount = 0
 let maxAds = 3
 
-let timerInterval
+let video = document.getElementById("video")
 
 function playAd(){
 
@@ -206,31 +202,20 @@ adCount = 0
 
 document.getElementById("playerModal").style.display="flex"
 
-let video = document.getElementById("video")
-let adContainer = document.getElementById("adContainer")
-
-video.muted = true
-video.play().catch(()=>{})
-
-/* СОЗДАЕМ контейнер сразу при клике */
-
-adDisplayContainer = new google.ima.AdDisplayContainer(adContainer, video)
-
-adDisplayContainer.initialize()
-
-startAdRequest()
+startAd()
 
 }
 
-function startAdRequest(){
-
-let video = document.getElementById("video")
+async function startAd(){
 
 let uid = localStorage.getItem("uid")
 
 if(!uid){
+
 uid = "uid"+Math.floor(Math.random()*999999999)
-localStorage.setItem("uid", uid)
+
+localStorage.setItem("uid",uid)
+
 }
 
 let device = /Android|iPhone/i.test(navigator.userAgent) ? "mobile" : "desktop"
@@ -254,68 +239,75 @@ let vastUrl =
 +"&device_type=NCWEB"
 +"&web_client_type="+device
 +"&cb="+Date.now()
-+"&rnd="+Math.floor(Math.random()*1000000000)
++"&rnd="+Math.floor(Math.random()*999999999)
 
-adsLoader = new google.ima.AdsLoader(adDisplayContainer)
+try{
 
-adsLoader.addEventListener(
-google.ima.AdsManagerLoadedEvent.Type.ADS_MANAGER_LOADED,
-onAdsManagerLoaded
-)
+let response = await fetch(vastUrl)
 
-adsLoader.addEventListener(
-google.ima.AdErrorEvent.Type.AD_ERROR,
-onAdError
-)
+let xmlText = await response.text()
 
-let adsRequest = new google.ima.AdsRequest()
+let parser = new DOMParser()
 
-adsRequest.adTagUrl = vastUrl
+let xml = parser.parseFromString(xmlText,"text/xml")
 
-adsRequest.linearAdSlotWidth = window.innerWidth
-adsRequest.linearAdSlotHeight = window.innerHeight
+let mediaFile = xml.querySelector("MediaFile")
 
-adsLoader.requestAds(adsRequest)
+if(!mediaFile){
 
-}
+console.log("Нет MediaFile")
 
-function onAdsManagerLoaded(event){
+closePlayer()
 
-let video = document.getElementById("video")
-
-adsManager = event.getAdsManager(video)
-
-adsManager.init(
-window.innerWidth,
-window.innerHeight,
-google.ima.ViewMode.NORMAL
-)
-
-adsManager.start()
-
-adsManager.addEventListener(
-google.ima.AdEvent.Type.COMPLETE,
-onAdComplete
-)
-
-adsManager.addEventListener(
-google.ima.AdEvent.Type.STARTED,
-startAdTimer
-)
+return
 
 }
 
-function onAdComplete(){
+let videoUrl = mediaFile.textContent.trim()
 
-clearInterval(timerInterval)
+video.src = videoUrl
 
-document.getElementById("skipAd").style.display="none"
+video.play()
+
+startTimer()
+
+}catch(e){
+
+console.log("VAST error",e)
+
+closePlayer()
+
+}
+
+}
+
+function startTimer(){
+
+let timer = document.getElementById("adTimer")
+
+document.getElementById("skipAd").style.display="block"
+
+let interval = setInterval(()=>{
+
+if(video.duration){
+
+let remaining = Math.round(video.duration - video.currentTime)
+
+timer.innerText = "Реклама: "+remaining+" сек"
+
+}
+
+},500)
+
+video.onended = ()=>{
+
+clearInterval(interval)
 
 adCount++
 
 if(adCount < maxAds){
 
-startAdRequest()
+startAd()
 
 }else{
 
@@ -325,47 +317,23 @@ closePlayer()
 
 }
 
-function startAdTimer(){
-
-let timer = document.getElementById("adTimer")
-
-setTimeout(()=>{
-
-document.getElementById("skipAd").style.display="block"
-
-},5000)
-
-timerInterval = setInterval(()=>{
-
-if(!adsManager) return
-
-let remaining = Math.round(adsManager.getRemainingTime())
-
-timer.innerText = "Реклама: "+remaining+" сек"
-
-if(remaining <= 0){
-
-clearInterval(timerInterval)
-
-}
-
-},500)
-
 }
 
 function skipAd(){
 
-if(adsManager){
-adsManager.stop()
-}
+video.pause()
 
-}
+adCount++
 
-function onAdError(error){
+if(adCount < maxAds){
 
-console.log("Ad error", error)
+startAd()
+
+}else{
 
 closePlayer()
+
+}
 
 }
 
@@ -373,14 +341,9 @@ function closePlayer(){
 
 document.getElementById("playerModal").style.display="none"
 
-clearInterval(timerInterval)
+video.pause()
 
-document.getElementById("skipAd").style.display="none"
-
-if(adsManager){
-adsManager.destroy()
-adsManager = null
-}
+video.src=""
 
 }
 
