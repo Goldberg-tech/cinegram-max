@@ -2,7 +2,8 @@
 <html lang="ru">
 <head>
   <meta charset="UTF-8">
-  <title>TMA Wink VAST Mobile Test</title>
+  <title>TMA Wink VAST Test</title>
+  <link href="https://vjs.zencdn.net/7.23.0/video-js.css" rel="stylesheet" />
   <style>
     body, html {
       margin: 0; padding: 0;
@@ -13,61 +14,43 @@
     #player-container {
       width: 360px;
       height: 640px;
-      position: relative;
-    }
-    #fullscreen-btn {
-      position: absolute;
-      bottom: 10px;
-      right: 10px;
-      padding: 6px 12px;
-      background: rgba(255,255,255,0.8);
-      border: none;
-      border-radius: 4px;
-      cursor: pointer;
-      font-weight: bold;
     }
   </style>
 </head>
 <body>
 
-<div id="player-container"></div>
-<button id="fullscreen-btn">FullScreen</button>
+<div id="player-container">
+  <video
+    id="vast-player"
+    class="video-js vjs-default-skin"
+    controls
+    preload="auto"
+    width="360"
+    height="640"
+  ></video>
+</div>
 
-<!-- Wink Embed SDK -->
-<script src="https://static-adtech.wink.ru/embed-sdk/winkembed.umd.js"></script>
+<script src="https://vjs.zencdn.net/7.23.0/video.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/videojs-contrib-ads@6.9.0/dist/videojs-contrib-ads.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/videojs-ima@1.9.0/dist/videojs.ima.min.js"></script>
+
 <script>
-  const container = document.getElementById('player-container');
-
-  // Вставляем плеер Wink
-  const frame = WinkEmbedSDK.api.insertFrame(container, {
-    trackId: 23080,       // TrackId рекламного блока (preroll)
-    partnerId: 'P0',      // твой Partner ID
-    frameOptions: {
-      width: "360px",
-      height: "640px"
-    }
+  // Инициализация плеера
+  const player = videojs('vast-player', {
+    autoplay: true,
+    controls: true,
+    fluid: true
   });
 
-  // Кнопка FullScreen
-  const btn = document.getElementById('fullscreen-btn');
-  btn.addEventListener('click', () => {
-    if (container.requestFullscreen) {
-      container.requestFullscreen();
-    } else if (container.webkitRequestFullscreen) { /* Safari */
-      container.webkitRequestFullscreen();
-    } else if (container.msRequestFullscreen) { /* IE11 */
-      container.msRequestFullscreen();
-    }
+  // Вставляем твой прямой VAST URL
+  player.ima({
+    adTagUrl: 'https://ssp.wink.ru/v1/rt/avod/vast?ad_place_type=preroll&age_value=18&broadcast_type=ott&client_id=123&client_version=&domain=TMA&embedded=P5&is_child=false&is_paid=0&location=100001&san=web_vast_code&ad_position=1&content_id=23080&device_type=NCWEB&web_client_type=mobile'
   });
 
-  // Пример логирования событий рекламы
-  const { events } = WinkEmbedSDK;
-  frame.on(events.PLAYBACK_START, (payload) => {
-    console.log('Видео стартовало:', payload);
-  });
-  frame.on(events.AD_END, (payload) => {
-    console.log('Реклама закончилась:', payload);
-  });
+  // Слушаем события рекламы (для логирования, опционально)
+  player.on('adstart', () => console.log('Реклама началась'));
+  player.on('adend', () => console.log('Реклама закончилась'));
+  player.on('adskip', () => console.log('Реклама пропущена'));
 </script>
 
 </body>
