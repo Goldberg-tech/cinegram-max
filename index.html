@@ -1,280 +1,340 @@
 <!DOCTYPE html>
-<html lang="ru">
+<html>
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>TMA Wink Player с витриной</title>
+
+<title>TMA Wink Player</title>
 
 <style>
-html, body {
-    margin:0;
-    padding:0;
-    background:black;
-    height:100%;
-    overflow:hidden;
-    font-family:Arial;
+html,body{
+margin:0;
+padding:0;
+background:black;
+height:100%;
+overflow:hidden;
+font-family:Arial;
+color:white;
 }
 
-.vitrina{
-    display:flex;
-    gap:20px;
-    overflow-x:auto;
-    padding:20px;
-    background:#111;
+/* витрина */
+
+#showcase{
+position:absolute;
+top:0;
+left:0;
+width:100%;
+height:100%;
+overflow:auto;
+background:black;
+padding:16px;
+box-sizing:border-box;
+display:grid;
+grid-template-columns:repeat(2,1fr);
+gap:12px;
 }
 
-.vitrina::-webkit-scrollbar{
-    display:none;
+.poster{
+background:#111;
+border-radius:8px;
+overflow:hidden;
+cursor:pointer;
 }
 
-.card{
-    min-width:120px;
-    cursor:pointer;
-    text-align:center;
-    color:white;
+.poster img{
+width:100%;
+display:block;
 }
 
-.card img{
-    width:100px;
-    height:150px;
-    object-fit:cover;
-    border-radius:10px;
-}
+/* плеер */
 
-.card .title{
-    margin-top:5px;
-    font-size:14px;
-}
-
-#playerModal{
-    position:fixed;
-    top:0;
-    left:0;
-    width:100%;
-    height:100%;
-    background:black;
-    display:none;
-    align-items:center;
-    justify-content:center;
-    z-index:9999;
+#playerLayer{
+display:none;
+position:absolute;
+top:0;
+left:0;
+width:100%;
+height:100%;
 }
 
 video{
-    width:100%;
-    height:100%;
-    object-fit:contain;
-    background:black;
+width:100%;
+height:100%;
+object-fit:contain;
+background:black;
 }
 
 #loader{
-    position:absolute;
-    top:50%;
-    left:50%;
-    transform:translate(-50%,-50%);
-    color:white;
-    z-index:10;
+position:absolute;
+top:50%;
+left:50%;
+transform:translate(-50%,-50%);
+color:white;
 }
 
-#skipBtn, #muteBtn, #closeBtn{
-    position:absolute;
-    background:rgba(0,0,0,.6);
-    color:white;
-    padding:8px 14px;
-    border-radius:6px;
-    cursor:pointer;
-    z-index:10;
+#skipBtn{
+position:absolute;
+top:20px;
+right:20px;
+background:rgba(0,0,0,.6);
+color:white;
+padding:8px 14px;
+border-radius:6px;
+display:none;
+cursor:pointer;
+z-index:10;
 }
 
-#skipBtn{ top:20px; right:20px; display:none; }
-#muteBtn{ bottom:20px; right:20px; }
-#closeBtn{ top:20px; left:20px; }
+#muteBtn{
+position:absolute;
+bottom:20px;
+right:20px;
+background:rgba(0,0,0,.6);
+color:white;
+padding:8px 14px;
+border-radius:6px;
+cursor:pointer;
+z-index:10;
+}
 
 #clickLayer{
-    position:absolute;
-    top:0;
-    left:0;
-    width:100%;
-    height:100%;
+position:absolute;
+top:0;
+left:0;
+width:100%;
+height:100%;
 }
 </style>
 </head>
 
 <body>
 
-<!-- Витрина -->
-<div class="vitrina">
-    <div class="card" onclick="openPlayer(23080)">
-        <img src="posters/molodezhka.jpg" />
-        <div class="title">Молодежка</div>
-    </div>
-    <div class="card" onclick="openPlayer(23081)">
-        <img src="posters/kuhnya.jpg" />
-        <div class="title">Кухня</div>
-    </div>
-    <div class="card" onclick="openPlayer(23082)">
-        <img src="posters/grand.jpg" />
-        <div class="title">Гранд</div>
-    </div>
+<!-- ВИТРИНА -->
+
+<div id="showcase">
+
+<div class="poster"><img src="https://picsum.photos/300/450?1"></div>
+<div class="poster"><img src="https://picsum.photos/300/450?2"></div>
+<div class="poster"><img src="https://picsum.photos/300/450?3"></div>
+<div class="poster"><img src="https://picsum.photos/300/450?4"></div>
+
 </div>
 
-<!-- Плеер -->
-<div id="playerModal">
-    <div id="loader">Загрузка рекламы...</div>
-    <button id="skipBtn">Пропустить</button>
-    <button id="muteBtn">🔇</button>
-    <button id="closeBtn" onclick="closePlayer()">×</button>
-    <div id="clickLayer"></div>
-    <video id="adVideo" playsinline muted autoplay></video>
+<!-- ПЛЕЕР -->
+
+<div id="playerLayer">
+
+<div id="loader">Загрузка рекламы...</div>
+<div id="skipBtn">Пропустить</div>
+<div id="muteBtn">🔇</div>
+<div id="clickLayer"></div>
+
+<video id="adVideo" playsinline muted autoplay></video>
+
 </div>
 
 <script>
+
 const tg = window.Telegram?.WebApp;
 if(tg) tg.expand();
+
+/* витрина */
+
+const posters=document.querySelectorAll(".poster");
+const showcase=document.getElementById("showcase");
+const playerLayer=document.getElementById("playerLayer");
+
+posters.forEach(p=>{
+p.onclick=()=>{
+showcase.style.display="none";
+playerLayer.style.display="block";
+loadVast();
+};
+});
+
+/* оригинальный код рекламы */
 
 const video = document.getElementById("adVideo");
 const loader = document.getElementById("loader");
 const skipBtn = document.getElementById("skipBtn");
 const muteBtn = document.getElementById("muteBtn");
 const clickLayer = document.getElementById("clickLayer");
-const playerModal = document.getElementById("playerModal");
 
 let tracking = {};
 let clickThroughUrl = null;
 let quartiles = {};
 let skipAvailable = false;
-let currentContentId = null;
 
 function newDeviceId(){
-    return crypto.randomUUID();
+return crypto.randomUUID();
 }
 
-function buildVastUrl(contentId){
-    const deviceId = newDeviceId();
-    const domain = location.hostname || "t.me";
-    const cb = Date.now()+Math.floor(Math.random()*999999);
-    return `https://ssp.wink.ru/v1/rt/avod/vast?ad_place_type=preroll&age_value=18&broadcast_type=ott&client_id=${deviceId}&domain=${domain}&embedded=P5&is_child=false&is_paid=0&location=100001&san=web_vast_code&ad_position=1&content_id=${contentId}&device_type=NCWEB&web_client_type=mobile&cb=${cb}`;
+function buildVastUrl(){
+
+const deviceId = newDeviceId();
+const domain = location.hostname || "t.me";
+const cb = Date.now()+Math.floor(Math.random()*999999);
+
+return `https://ssp.wink.ru/v1/rt/avod/vast?ad_place_type=preroll&age_value=18&broadcast_type=ott&client_id=${deviceId}&domain=${domain}&embedded=P5&is_child=false&is_paid=0&location=100001&san=web_vast_code&ad_position=1&content_id=${Math.floor(Math.random()*99999)}&device_type=NCWEB&web_client_type=mobile&cb=${cb}`;
 }
 
 async function fetchVast(url,depth=0){
-    if(depth>5) throw "wrapper";
-    const res = await fetch(url);
-    const text = await res.text();
-    const xml = new DOMParser().parseFromString(text,"text/xml");
-    const wrapper = xml.querySelector("Wrapper VASTAdTagURI");
-    if(wrapper) return fetchVast(wrapper.textContent.trim(),depth+1);
-    return xml;
+
+if(depth>5) throw "wrapper";
+
+const res = await fetch(url);
+const text = await res.text();
+
+const xml = new DOMParser().parseFromString(text,"text/xml");
+
+const wrapper = xml.querySelector("Wrapper VASTAdTagURI");
+
+if(wrapper){
+return fetchVast(wrapper.textContent.trim(),depth+1);
+}
+
+return xml;
+
 }
 
 function fireTracking(event){
-    if(!tracking[event]) return;
-    tracking[event].forEach(url=>{
-        fetch(url).catch(()=>{});
-    });
+
+if(!tracking[event]) return;
+
+tracking[event].forEach(url=>{
+fetch(url).catch(()=>{});
+});
+
 }
 
 function finishAdFlow(){
-    video.pause();
-    video.currentTime=0;
-    skipAvailable=false;
-    skipBtn.style.display="none";
-    loader.style.display="block";
-    loader.innerText="Загрузка рекламы...";
-    setTimeout(()=>loadVast(currentContentId),500);
+
+video.pause();
+video.currentTime=0;
+
+skipAvailable=false;
+skipBtn.style.display="none";
+
+loader.style.display="block";
+loader.innerText="Загрузка рекламы...";
+
+setTimeout(loadVast,500);
+
 }
 
-async function loadVast(contentId){
-    try{
-        loader.innerText="Загрузка рекламы...";
-        const vastUrl = buildVastUrl(contentId);
-        const xml = await fetchVast(vastUrl);
-        const mediaFile = xml.querySelector("MediaFile");
-        if(!mediaFile){
-            loader.innerText="Нет рекламы, пробуем снова";
-            setTimeout(()=>loadVast(contentId),1000);
-            return;
-        }
-        video.src = mediaFile.textContent.trim();
-        video.load();
-        tracking={};
-        clickThroughUrl=null;
-        quartiles={};
-        xml.querySelectorAll("Tracking").forEach(n=>{
-            const e=n.getAttribute("event");
-            if(!tracking[e]) tracking[e]=[];
-            tracking[e].push(n.textContent.trim());
-        });
-        const imp=xml.querySelector("Impression");
-        if(imp) tracking.impression=[imp.textContent.trim()];
-        const clickNode=xml.querySelector("ClickThrough");
-        if(clickNode) clickThroughUrl=clickNode.textContent.trim();
-        loader.style.display="none";
-        video.muted=true;
-        await video.play();
-    }catch(e){
-        loader.innerText="Нет рекламы, повторяем";
-        setTimeout(()=>loadVast(contentId),1500);
-    }
+async function loadVast(){
+
+try{
+
+loader.innerText="Загрузка рекламы...";
+
+const vastUrl = buildVastUrl();
+
+const xml = await fetchVast(vastUrl);
+
+const mediaFile = xml.querySelector("MediaFile");
+
+if(!mediaFile){
+
+loader.innerText="Нет рекламы, пробуем снова";
+
+setTimeout(loadVast,1000);
+
+return;
+
+}
+
+video.src = mediaFile.textContent.trim();
+video.load();
+
+tracking={};
+clickThroughUrl=null;
+quartiles={};
+
+xml.querySelectorAll("Tracking").forEach(n=>{
+const e=n.getAttribute("event");
+if(!tracking[e]) tracking[e]=[];
+tracking[e].push(n.textContent.trim());
+});
+
+const imp=xml.querySelector("Impression");
+if(imp) tracking.impression=[imp.textContent.trim()];
+
+const clickNode=xml.querySelector("ClickThrough");
+if(clickNode) clickThroughUrl=clickNode.textContent.trim();
+
+loader.style.display="none";
+
+video.muted=true;
+
+await video.play();
+
+}catch(e){
+
+loader.innerText="Нет рекламы, повторяем";
+
+setTimeout(loadVast,1500);
+
+}
+
 }
 
 video.addEventListener("ended",()=>{
-    fireTracking("complete");
-    finishAdFlow();
+fireTracking("complete");
+finishAdFlow();
 });
 
 video.addEventListener("timeupdate",()=>{
-    if(!video.duration) return;
-    const p = video.currentTime/video.duration;
-    if(video.currentTime>=5 && !skipAvailable){
-        skipAvailable=true;
-        skipBtn.style.display="block";
-    }
-    if(p>=0.25 && !quartiles.q1){
-        quartiles.q1=true;
-        fireTracking("firstQuartile");
-    }
-    if(p>=0.5 && !quartiles.q2){
-        quartiles.q2=true;
-        fireTracking("midpoint");
-    }
-    if(p>=0.75 && !quartiles.q3){
-        quartiles.q3=true;
-        fireTracking("thirdQuartile");
-    }
+
+if(!video.duration) return;
+
+const p = video.currentTime/video.duration;
+
+if(video.currentTime>=5 && !skipAvailable){
+
+skipAvailable=true;
+skipBtn.style.display="block";
+
+}
+
+if(p>=0.25 && !quartiles.q1){
+quartiles.q1=true;
+fireTracking("firstQuartile");
+}
+
+if(p>=0.5 && !quartiles.q2){
+quartiles.q2=true;
+fireTracking("midpoint");
+}
+
+if(p>=0.75 && !quartiles.q3){
+quartiles.q3=true;
+fireTracking("thirdQuartile");
+}
+
 });
 
 skipBtn.onclick=()=>{
-    fireTracking("skip");
-    finishAdFlow();
+fireTracking("skip");
+finishAdFlow();
 };
 
 muteBtn.onclick=()=>{
-    video.muted=!video.muted;
-    muteBtn.innerText = video.muted?"🔇":"🔊";
+video.muted=!video.muted;
+muteBtn.innerText=video.muted?"🔇":"🔊";
 };
 
 clickLayer.onclick=()=>{
-    if(!clickThroughUrl) return;
-    fireTracking("click");
-    if(tg) tg.openLink(clickThroughUrl);
-    else window.open(clickThroughUrl,"_blank");
+
+if(!clickThroughUrl) return;
+
+fireTracking("click");
+
+if(tg) tg.openLink(clickThroughUrl);
+else window.open(clickThroughUrl,"_blank");
+
 };
 
-function openPlayer(contentId){
-    currentContentId = contentId;
-    playerModal.style.display="flex";
-    loader.innerText="Загрузка рекламы...";
-    loadVast(contentId);
-}
-
-function closePlayer(){
-    playerModal.style.display="none";
-    video.pause();
-    video.currentTime=0;
-    skipBtn.style.display="none";
-    loader.style.display="block";
-}
-
 </script>
-
 </body>
 </html>
