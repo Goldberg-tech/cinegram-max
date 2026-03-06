@@ -74,104 +74,84 @@ let adsLoader
 let adsManager
 
 function getUID(){
-
-if(window.Telegram?.WebApp?.initDataUnsafe?.user?.id){
-return Telegram.WebApp.initDataUnsafe.user.id
-}
-
-return 'web_'+Math.random().toString(36).substring(2)
-
+    if(window.Telegram?.WebApp?.initDataUnsafe?.user?.id){
+        return Telegram.WebApp.initDataUnsafe.user.id
+    }
+    return 'web_'+Math.random().toString(36).substring(2)
 }
 
 function getDomain(){
-return location.hostname
+    return location.hostname
 }
 
 function buildVAST(){
+    const uid = getUID()
+    const domain = getDomain()
+    const isMobile = /Android|iPhone/i.test(navigator.userAgent)
 
-const uid = getUID()
-const domain = getDomain()
+    const base = isMobile
+        ? "https://ssp.wink.ru/v1/rt/avod/vast?ad_place_type=preroll&age_value=18&broadcast_type=ott&client_id="+uid+"&client_version=&domain="+domain+"&embedded=P5&is_child=false&is_paid=0&location=100001&san=web_vast_code&ad_position=1&content_id=23080&device_type=NCWEB&web_client_type=mobile"
+        : "https://ssp.wink.ru/v1/rt/avod/vast?ad_place_type=preroll&age_value=18&broadcast_type=ott&client_id="+uid+"&client_version=&domain="+domain+"&embedded=P5&is_child=false&is_paid=0&location=100001&san=web_vast_code&ad_position=1&content_id=23080&device_type=NCWEB&web_client_type=desktop"
 
-const isMobile = /Android|iPhone/i.test(navigator.userAgent)
-
-const base = isMobile
-? "https://ssp.wink.ru/v1/rt/avod/vast?ad_place_type=preroll&age_value=18&broadcast_type=ott&client_id="+uid+"&client_version=&domain="+domain+"&embedded=P5&is_child=false&is_paid=0&location=100001&san=web_vast_code&ad_position=1&content_id=23080&device_type=NCWEB&web_client_type=mobile"
-: "https://ssp.wink.ru/v1/rt/avod/vast?ad_place_type=preroll&age_value=18&broadcast_type=ott&client_id="+uid+"&client_version=&domain="+domain+"&embedded=P5&is_child=false&is_paid=0&location=100001&san=web_vast_code&ad_position=1&content_id=23080&device_type=NCWEB&web_client_type=desktop"
-
-return base
-
+    return base
 }
 
 function initIMA(){
+    const adDisplayContainer = new google.ima.AdDisplayContainer(
+        adContainer,
+        video
+    )
+    adDisplayContainer.initialize() // Важная инициализация перед показом рекламы
 
-const adDisplayContainer = new google.ima.AdDisplayContainer(
-adContainer,
-video
-)
+    adsLoader = new google.ima.AdsLoader(adDisplayContainer)
 
-adsLoader = new google.ima.AdsLoader(adDisplayContainer)
+    adsLoader.addEventListener(
+        google.ima.AdsManagerLoadedEvent.Type.ADS_MANAGER_LOADED,
+        onAdsManagerLoaded,
+        false
+    )
 
-adsLoader.addEventListener(
-google.ima.AdsManagerLoadedEvent.Type.ADS_MANAGER_LOADED,
-onAdsManagerLoaded,
-false
-)
-
-adsLoader.addEventListener(
-google.ima.AdErrorEvent.Type.AD_ERROR,
-onAdError,
-false
-)
-
+    adsLoader.addEventListener(
+        google.ima.AdErrorEvent.Type.AD_ERROR,
+        onAdError,
+        false
+    )
 }
 
 function requestAds(){
+    const vastUrl = buildVAST()
 
-const vastUrl = buildVAST()
+    const adsRequest = new google.ima.AdsRequest()
+    adsRequest.adTagUrl = vastUrl
+    adsRequest.linearAdSlotWidth = 640
+    adsRequest.linearAdSlotHeight = 360
+    adsRequest.nonLinearAdSlotWidth = 640
+    adsRequest.nonLinearAdSlotHeight = 150
 
-const adsRequest = new google.ima.AdsRequest()
-
-adsRequest.adTagUrl = vastUrl
-adsRequest.linearAdSlotWidth = 640
-adsRequest.linearAdSlotHeight = 360
-adsRequest.nonLinearAdSlotWidth = 640
-adsRequest.nonLinearAdSlotHeight = 150
-
-adsLoader.requestAds(adsRequest)
-
+    adsLoader.requestAds(adsRequest)
 }
 
 function onAdsManagerLoaded(event){
+    adsManager = event.getAdsManager(video)
 
-adsManager = event.getAdsManager(video)
+    adsManager.addEventListener(
+        google.ima.AdErrorEvent.Type.AD_ERROR,
+        onAdError
+    )
 
-adsManager.addEventListener(
-google.ima.AdErrorEvent.Type.AD_ERROR,
-onAdError
-)
-
-adsManager.init(640,360,google.ima.ViewMode.NORMAL)
-
-adsManager.start()
-
+    adsManager.init(640,360,google.ima.ViewMode.NORMAL)
+    adsManager.start()
 }
 
 function onAdError(error){
-
-console.log("Ad error", error)
-
-video.play()
-
+    console.log("Ad error", error)
+    video.play()
 }
 
 startBtn.onclick = () => {
-
-startBtn.style.display = "none"
-
-initIMA()
-
-requestAds()
-
+    startBtn.style.display = "none"
+    initIMA()
+    requestAds()
 }
 
 </script>
