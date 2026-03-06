@@ -220,7 +220,6 @@ localStorage.setItem("uid", uid)
 }
 
 let device = /Android|iPhone/i.test(navigator.userAgent) ? "mobile" : "desktop"
-
 let domain = window.location.hostname
 
 let vastUrl =
@@ -244,6 +243,8 @@ let vastUrl =
 
 adDisplayContainer = new google.ima.AdDisplayContainer(adContainer, video)
 
+adDisplayContainer.initialize()
+
 adsLoader = new google.ima.AdsLoader(adDisplayContainer)
 
 adsLoader.addEventListener(
@@ -263,8 +264,6 @@ adsRequest.linearAdSlotWidth = window.innerWidth
 adsRequest.linearAdSlotHeight = window.innerHeight
 
 adsLoader.requestAds(adsRequest)
-
-adDisplayContainer.initialize()
 
 }
 
@@ -345,9 +344,7 @@ clearInterval(timerInterval)
 function skipAd(){
 
 if(adsManager){
-
 adsManager.stop()
-
 }
 
 }
@@ -356,7 +353,19 @@ function onAdError(error){
 
 console.log("Ad error", error)
 
+/* пытаемся загрузить рекламу заново */
+
+if(adCount < maxAds){
+
+setTimeout(()=>{
+startAdRequest()
+},1000)
+
+}else{
+
 closePlayer()
+
+}
 
 }
 
