@@ -1,57 +1,277 @@
 <!DOCTYPE html>
-<html lang="ru">
+<html>
 <head>
-  <meta charset="UTF-8">
-  <title>TMA Wink VAST Test</title>
-  <link href="https://vjs.zencdn.net/7.23.0/video-js.css" rel="stylesheet" />
-  <style>
-    body, html {
-      margin: 0; padding: 0;
-      width: 100%; height: 100%;
-      display: flex; justify-content: center; align-items: center;
-      background: #000;
-    }
-    #player-container {
-      width: 360px;
-      height: 640px;
-    }
-  </style>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>TMA Ad Player</title>
+
+<style>
+html, body {
+  margin:0;
+  padding:0;
+  background:#000;
+  height:100%;
+  overflow:hidden;
+  font-family: Arial, sans-serif;
+}
+
+video {
+  width:100%;
+  height:100%;
+  object-fit:contain;
+  background:#000;
+}
+
+#clickLayer {
+  position:absolute;
+  top:0;
+  left:0;
+  width:100%;
+  height:100%;
+  cursor:pointer;
+}
+
+#loader {
+  position:absolute;
+  top:50%;
+  left:50%;
+  transform:translate(-50%, -50%);
+  color:#fff;
+  font-size:18px;
+}
+
+#skipBtn {
+  position:absolute;
+  top:20px;
+  right:20px;
+  background:rgba(0,0,0,0.6);
+  color:#fff;
+  padding:8px 12px;
+  border-radius:6px;
+  display:none;
+  cursor:pointer;
+}
+
+#muteBtn {
+  position:absolute;
+  bottom:20px;
+  right:20px;
+  background:rgba(0,0,0,0.6);
+  color:#fff;
+  padding:8px 12px;
+  border-radius:6px;
+  cursor:pointer;
+}
+</style>
 </head>
 <body>
 
-<div id="player-container">
-  <video
-    id="vast-player"
-    class="video-js vjs-default-skin"
-    controls
-    preload="auto"
-    width="360"
-    height="640"
-  ></video>
-</div>
-
-<script src="https://vjs.zencdn.net/7.23.0/video.min.js"></script>
-<script src="https://cdn.jsdelivr.net/npm/videojs-contrib-ads@6.9.0/dist/videojs-contrib-ads.min.js"></script>
-<script src="https://cdn.jsdelivr.net/npm/videojs-ima@1.9.0/dist/videojs.ima.min.js"></script>
+<div id="loader">Загрузка рекламы...</div>
+<div id="skipBtn">Пропустить через 5</div>
+<div id="muteBtn">🔇</div>
+<div id="clickLayer"></div>
+<video id="adVideo" playsinline muted autoplay></video>
 
 <script>
-  // Инициализация плеера
-  const player = videojs('vast-player', {
-    autoplay: true,
-    controls: true,
-    fluid: true
+const tg = window.Telegram?.WebApp;
+if (tg) tg.expand();
+
+const video = document.getElementById("adVideo");
+const clickLayer = document.getElementById("clickLayer");
+const loader = document.getElementById("loader");
+const skipBtn = document.getElementById("skipBtn");
+const muteBtn = document.getElementById("muteBtn");
+
+let tracking = {};
+let clickThroughUrl = null;
+let quartilesFired = {};
+let skipAvailable = false;
+
+let adQueue = [
+  "VAST_URL_1",
+  "VAST_URL_2"
+];
+
+let currentAdIndex = 0;
+
+const deviceId = localStorage.device_id || crypto.randomUUID();
+localStorage.device_id = deviceId;
+
+const POSTBACK_URL = "https://yourtracker.com/postback";
+
+// ================= LOGGING =================
+function logEvent(type, data = {}) {
+
+  console.log("EVENT:", type, data);
+
+  fetch(POSTBACK_URL, {
+    method: "POST",
+    headers: {"Content-Type":"application/json"},
+    body: JSON.stringify({
+      event: type,
+      device_id: deviceId,
+      ad_index: currentAdIndex,
+      timestamp: Date.now(),
+      ...data
+    })
+  }).catch(()=>{});
+}
+
+// ================= TRACKING =================
+function fireTracking(event) {
+  if (!tracking[event]) return;
+
+  tracking[event].forEach(url => {
+    fetch(url).catch(()=>{});
   });
 
-  // Вставляем твой прямой VAST URL
-  player.ima({
-    adTagUrl: 'https://ssp.wink.ru/v1/rt/avod/vast?ad_place_type=preroll&age_value=18&broadcast_type=ott&client_id=123&client_version=&domain=TMA&embedded=P5&is_child=false&is_paid=0&location=100001&san=web_vast_code&ad_position=1&content_id=23080&device_type=NCWEB&web_client_type=mobile'
+  logEvent(event);
+}
+
+// ================= VAST FETCH =================
+async function fetchVast(url, depth = 0) {
+
+  if (depth > 5) throw new Error("Too many wrappers");
+
+  const res = await fetch(url);
+  const xmlText = await res.text();
+  const xml = new DOMParser().parseFromString(xmlText, "text/xml");
+
+  const wrapper = xml.querySelector("Wrapper VASTAdTagURI");
+
+  if (wrapper) {
+    return fetchVast(wrapper.textContent.trim(), depth+1);
+  }
+
+  return xml;
+}
+
+async function loadAd() {
+
+  loader.style.display = "block";
+  skipBtn.style.display = "none";
+  skipAvailable = false;
+  quartilesFired = {};
+  tracking = {};
+  clickThroughUrl = null;
+
+  const vastUrl = adQueue[currentAdIndex];
+
+  const xml = await fetchVast(vastUrl);
+
+  const mediaFile = xml.querySelector("MediaFile");
+  if (!mediaFile) {
+    logEvent("no_media");
+    playNextAd();
+    return;
+  }
+
+  video.src = mediaFile.textContent.trim();
+
+  xml.querySelectorAll("Tracking").forEach(node => {
+    const event = node.getAttribute("event");
+    if (!tracking[event]) tracking[event] = [];
+    tracking[event].push(node.textContent.trim());
   });
 
-  // Слушаем события рекламы (для логирования, опционально)
-  player.on('adstart', () => console.log('Реклама началась'));
-  player.on('adend', () => console.log('Реклама закончилась'));
-  player.on('adskip', () => console.log('Реклама пропущена'));
+  const impression = xml.querySelector("Impression");
+  if (impression) tracking.impression = [impression.textContent.trim()];
+
+  const clickNode = xml.querySelector("ClickThrough");
+  if (clickNode) clickThroughUrl = clickNode.textContent.trim();
+
+  loader.style.display = "none";
+
+  video.play();
+  logEvent("ad_loaded");
+}
+
+// ================= VIDEO EVENTS =================
+video.addEventListener("play", () => {
+  fireTracking("impression");
+  fireTracking("start");
+  logEvent("play");
+});
+
+video.addEventListener("timeupdate", () => {
+
+  if (!video.duration) return;
+
+  const progress = video.currentTime / video.duration;
+
+  if (video.currentTime >= 5 && !skipAvailable) {
+    skipAvailable = true;
+    skipBtn.style.display = "block";
+    skipBtn.innerText = "Пропустить";
+  }
+
+  if (progress >= 0.25 && !quartilesFired.q1) {
+    quartilesFired.q1 = true;
+    fireTracking("firstQuartile");
+  }
+
+  if (progress >= 0.5 && !quartilesFired.q2) {
+    quartilesFired.q2 = true;
+    fireTracking("midpoint");
+  }
+
+  if (progress >= 0.75 && !quartilesFired.q3) {
+    quartilesFired.q3 = true;
+    fireTracking("thirdQuartile");
+  }
+});
+
+video.addEventListener("ended", () => {
+  fireTracking("complete");
+  logEvent("complete");
+  playNextAd();
+});
+
+// ================= NEXT AD =================
+function playNextAd() {
+
+  currentAdIndex++;
+
+  if (currentAdIndex < adQueue.length) {
+    loadAd();
+  } else {
+    logEvent("ad_pod_finished");
+    console.log("Все ролики завершены");
+  }
+}
+
+// ================= SKIP =================
+skipBtn.addEventListener("click", () => {
+  logEvent("skip");
+  playNextAd();
+});
+
+// ================= MUTE =================
+muteBtn.addEventListener("click", () => {
+
+  video.muted = !video.muted;
+  muteBtn.innerText = video.muted ? "🔇" : "🔊";
+  logEvent(video.muted ? "muted" : "unmuted");
+});
+
+// ================= CLICK =================
+clickLayer.addEventListener("click", () => {
+
+  if (!clickThroughUrl) return;
+
+  fireTracking("click");
+  logEvent("click", {url: clickThroughUrl});
+
+  if (tg) {
+    tg.openLink(clickThroughUrl);
+  } else {
+    window.open(clickThroughUrl, "_blank");
+  }
+});
+
+// ================= START =================
+loadAd();
+
 </script>
-
 </body>
 </html>
