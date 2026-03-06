@@ -1,180 +1,415 @@
 <!DOCTYPE html>
 <html lang="ru">
+
 <head>
+
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Кинотеатр</title>
+
 <script src="https://imasdk.googleapis.com/js/sdkloader/ima3.js"></script>
+
 <style>
-body{margin:0;background:#0f0f0f;color:white;font-family:Arial;}
-h1{padding:20px;margin:0;}
-.vitrina{display:flex;gap:20px;overflow-x:auto;padding:20px;}
+
+body{
+margin:0;
+background:#0f0f0f;
+color:white;
+font-family:Arial;
+}
+
+h1{
+padding:20px;
+margin:0;
+}
+
+.vitrina{
+display:flex;
+gap:20px;
+overflow-x:auto;
+padding:20px;
+}
+
 .vitrina::-webkit-scrollbar{display:none;}
-.card{min-width:65vw;cursor:pointer;}
-.card img{width:65vw;height:90vw;object-fit:cover;border-radius:20px;}
-.title{margin-top:10px;font-size:18px;}
-#playerModal{position:fixed;top:0;left:0;width:100%;height:100%;background:black;display:none;align-items:center;justify-content:center;z-index:9999;flex-direction:column;}
-#adText{margin-bottom:10px;font-size:18px;z-index:10001;}
-#videoContainer{width:100%;max-width:900px;position:relative;}
-video{width:100%;height:auto;}
-.close{position:absolute;top:20px;right:25px;font-size:35px;cursor:pointer;z-index:10000;}
-#adTimer{position:absolute;bottom:20px;left:20px;background:rgba(0,0,0,0.6);padding:8px 12px;border-radius:8px;font-size:14px;z-index:9999;}
-#skipAd{position:absolute;bottom:20px;right:20px;background:#ff0000;border:none;padding:10px 16px;color:white;border-radius:8px;display:none;z-index:9999;}
-#soundBtn{position:absolute;top:20px;right:20px;background:#333;border:none;padding:8px 12px;color:white;border-radius:6px;cursor:pointer;z-index:9999;}
+
+.card{
+min-width:65vw;
+cursor:pointer;
+}
+
+.card img{
+width:65vw;
+height:90vw;
+object-fit:cover;
+border-radius:20px;
+}
+
+.title{
+margin-top:10px;
+font-size:18px;
+}
+
+#playerModal{
+position:fixed;
+top:0;
+left:0;
+width:100%;
+height:100%;
+background:black;
+display:none;
+flex-direction:column;
+align-items:center;
+justify-content:center;
+z-index:9999;
+}
+
+#adTopText{
+margin-bottom:10px;
+font-size:16px;
+}
+
+#videoContainer{
+width:100%;
+max-width:900px;
+position:relative;
+}
+
+video{
+width:100%;
+}
+
+.close{
+position:absolute;
+top:10px;
+right:20px;
+font-size:35px;
+cursor:pointer;
+z-index:10000;
+}
+
+#adTimer{
+position:absolute;
+bottom:20px;
+left:20px;
+background:rgba(0,0,0,0.6);
+padding:8px 12px;
+border-radius:8px;
+}
+
+#skipAd{
+position:absolute;
+bottom:20px;
+right:20px;
+background:#ff0000;
+border:none;
+padding:10px 16px;
+color:white;
+border-radius:8px;
+display:none;
+}
+
+#muteBtn{
+position:absolute;
+top:20px;
+left:20px;
+background:rgba(0,0,0,0.6);
+border:none;
+color:white;
+padding:8px 10px;
+border-radius:8px;
+}
+
 </style>
+
 </head>
+
 <body>
 
 <h1>Сериалы</h1>
 
-<div class="vitrina">
-<div class="card" onclick="playAd(0)"><img src="posters/molodezhka.jpg"><div class="title">Молодежка</div></div>
-<div class="card" onclick="playAd(1)"><img src="posters/kuhnya.jpg"><div class="title">Кухня</div></div>
-<div class="card" onclick="playAd(2)"><img src="posters/grand.jpg"><div class="title">Гранд</div></div>
-<div class="card" onclick="playAd(3)"><img src="posters/deti-peremen.jpg"><div class="title">Дети перемен</div></div>
-<div class="card" onclick="playAd(4)"><img src="posters/slovo-pacana.jpg"><div class="title">Слово пацана</div></div>
-<div class="card" onclick="playAd(5)"><img src="posters/obnalshik.jpg"><div class="title">Обнальщик</div></div>
+<div class="vitrina" id="vitrina">
+
+<div class="card" onclick="playAd(0)">
+<img src="posters/molodezhka.jpg">
+<div class="title">Молодежка</div>
+</div>
+
+<div class="card" onclick="playAd(1)">
+<img src="posters/kuhnya.jpg">
+<div class="title">Кухня</div>
+</div>
+
+<div class="card" onclick="playAd(2)">
+<img src="posters/grand.jpg">
+<div class="title">Гранд</div>
+</div>
+
+<div class="card" onclick="playAd(3)">
+<img src="posters/deti-peremen.jpg">
+<div class="title">Дети перемен</div>
+</div>
+
+<div class="card" onclick="playAd(4)">
+<img src="posters/slovo-pacana.jpg">
+<div class="title">Слово пацана</div>
+</div>
+
+<div class="card" onclick="playAd(5)">
+<img src="posters/obnalshik.jpg">
+<div class="title">Обнальщик</div>
+</div>
+
 </div>
 
 <div id="playerModal">
-<div class="close" onclick="closePlayer()">×</div>
-<div id="adText">Просмотр начнется после рекламы</div>
+
+<div id="adTopText">Просмотр начнется после рекламы</div>
+
 <div id="videoContainer">
-<button id="soundBtn" onclick="toggleSound()">🔊</button>
+
+<div class="close" onclick="closePlayer()">×</div>
+
 <video id="video" playsinline autoplay muted></video>
+
 <div id="adContainer"></div>
+
+<button id="muteBtn" onclick="toggleSound()">🔇</button>
+
 <div id="adTimer"></div>
+
 <button id="skipAd" onclick="skipAd()">Пропустить</button>
+
 </div>
+
 </div>
 
 <script>
-let adsLoader, adsManager, adDisplayContainer;
-let adCount = 0, maxAds = 3;
-let currentPoster = 0;
-let timerInterval;
 
-function playAd(posterIndex){
-  currentPoster = posterIndex;
-  adCount = 0;
-  document.getElementById("playerModal").style.display="flex";
-  document.getElementById("adText").innerText="Просмотр начнется после рекламы";
-  resetAds();
-  prepareVideoAndAd();
+let adsLoader
+let adsManager
+let adDisplayContainer
+
+let adCount=0
+let maxAds=3
+let timerInterval
+let currentPoster=0
+
+function playAd(index){
+
+currentPoster=index
+adCount=0
+
+destroyAds()
+
+document.getElementById("playerModal").style.display="flex"
+
+startAdRequest()
+
 }
 
-function resetAds(){
-  if(adsManager){ adsManager.destroy(); adsManager = null; }
-  clearInterval(timerInterval);
-  document.getElementById("skipAd").style.display="none";
-  const video = document.getElementById("video");
-  video.pause(); video.removeAttribute("src"); video.load();
+function deviceUID(){
+
+let uid=localStorage.getItem("uid")
+
+if(!uid){
+uid="uid"+Math.floor(Math.random()*999999999)
+localStorage.setItem("uid",uid)
 }
 
-function prepareVideoAndAd(){
-  const video = document.getElementById("video");
-  adDisplayContainer = new google.ima.AdDisplayContainer(document.getElementById("adContainer"), video);
-  adDisplayContainer.initialize();
-  video.play().then(()=>{ startAdRequest(); }).catch(()=>{ startAdRequest(); });
+return uid
+
+}
+
+function vastURL(){
+
+let uid=deviceUID()
+let domain=location.hostname
+let device=/Android|iPhone/i.test(navigator.userAgent)?"mobile":"desktop"
+
+return "https://ssp.wink.ru/v1/rt/avod/vast?ad_place_type=preroll"
++"&age_value=18"
++"&broadcast_type=ott"
++"&client_id="+uid
++"&client_version="
++"&domain="+domain
++"&embedded=P5"
++"&is_child=false"
++"&is_paid=0"
++"&location=100001"
++"&san=web_vast_code"
++"&ad_position=1"
++"&content_id=23080"
++"&device_type=NCWEB"
++"&web_client_type="+device
++"&cb="+Date.now()
+
 }
 
 function startAdRequest(){
-  const video = document.getElementById("video");
-  const adContainer = document.getElementById("adContainer");
-  adContainer.innerHTML="";
 
-  let uid = localStorage.getItem("uid");
-  if(!uid){ uid="uid"+Math.floor(Math.random()*999999999); localStorage.setItem("uid",uid); }
-  let device = /Android|iPhone/i.test(navigator.userAgent)?"mobile":"desktop";
-  let domain = window.location.hostname;
+destroyAds()
 
-  let vastUrl = "https://ssp.wink.ru/v1/rt/avod/vast?ad_place_type=preroll"
-    +"&age_value=18"
-    +"&broadcast_type=ott"
-    +"&client_id="+uid
-    +"&client_version="
-    +"&domain="+domain
-    +"&embedded=P5"
-    +"&is_child=false"
-    +"&is_paid=0"
-    +"&location=100001"
-    +"&san=web_vast_code"
-    +"&ad_position=1"
-    +"&content_id=23080"
-    +"&device_type=NCWEB"
-    +"&web_client_type="+device
-    +"&cb="+Date.now()
-    +"&rnd="+Math.floor(Math.random()*1000000000);
+let video=document.getElementById("video")
+let adContainer=document.getElementById("adContainer")
 
-  adsLoader = new google.ima.AdsLoader(adDisplayContainer);
-  adsLoader.addEventListener(google.ima.AdsManagerLoadedEvent.Type.ADS_MANAGER_LOADED, onAdsManagerLoaded, false);
-  adsLoader.addEventListener(google.ima.AdErrorEvent.Type.AD_ERROR, onAdError, false);
+adDisplayContainer=new google.ima.AdDisplayContainer(adContainer,video)
 
-  let adsRequest = new google.ima.AdsRequest();
-  adsRequest.adTagUrl = vastUrl;
-  adsRequest.linearAdSlotWidth = window.innerWidth;
-  adsRequest.linearAdSlotHeight = window.innerHeight;
+adsLoader=new google.ima.AdsLoader(adDisplayContainer)
 
-  adsLoader.requestAds(adsRequest);
+adsLoader.addEventListener(
+google.ima.AdsManagerLoadedEvent.Type.ADS_MANAGER_LOADED,
+onAdsManagerLoaded
+)
+
+adsLoader.addEventListener(
+google.ima.AdErrorEvent.Type.AD_ERROR,
+onAdError
+)
+
+let adsRequest=new google.ima.AdsRequest()
+
+adsRequest.adTagUrl=vastURL()
+adsRequest.linearAdSlotWidth=window.innerWidth
+adsRequest.linearAdSlotHeight=window.innerHeight
+
+adsLoader.requestAds(adsRequest)
+
+adDisplayContainer.initialize()
+
 }
 
 function onAdsManagerLoaded(event){
-  const video = document.getElementById("video");
-  adsManager = event.getAdsManager(video);
-  adsManager.init(window.innerWidth, window.innerHeight, google.ima.ViewMode.NORMAL);
-  adsManager.start();
-  adsManager.addEventListener(google.ima.AdEvent.Type.COMPLETE, onAdComplete);
-  adsManager.addEventListener(google.ima.AdEvent.Type.STARTED, startAdTimer);
-}
 
-function startAdTimer(){
-  const timer = document.getElementById("adTimer");
-  setTimeout(()=>{ document.getElementById("skipAd").style.display="block"; }, 5000);
-  timerInterval = setInterval(()=>{
-    if(!adsManager) return;
-    const remaining = Math.round(adsManager.getRemainingTime());
-    timer.innerText="Реклама: "+remaining+" сек";
-    if(remaining <=0) clearInterval(timerInterval);
-  },500);
+let video=document.getElementById("video")
+
+adsManager=event.getAdsManager(video)
+
+adsManager.init(
+window.innerWidth,
+window.innerHeight,
+google.ima.ViewMode.NORMAL
+)
+
+adsManager.start()
+
+adsManager.addEventListener(
+google.ima.AdEvent.Type.COMPLETE,
+onAdComplete
+)
+
+adsManager.addEventListener(
+google.ima.AdEvent.Type.STARTED,
+startAdTimer
+)
+
 }
 
 function onAdComplete(){
-  clearInterval(timerInterval);
-  document.getElementById("skipAd").style.display="none";
-  adCount++;
-  if(adCount < maxAds){
-    prepareVideoAndAd();
-  } else {
-    autoNextPoster();
-  }
+
+clearInterval(timerInterval)
+
+document.getElementById("skipAd").style.display="none"
+
+adCount++
+
+if(adCount<maxAds){
+
+startAdRequest()
+
+}else{
+
+closePlayer()
+autoNextPoster()
+
+}
+
+}
+
+function startAdTimer(){
+
+let timer=document.getElementById("adTimer")
+
+setTimeout(()=>{
+document.getElementById("skipAd").style.display="block"
+},5000)
+
+timerInterval=setInterval(()=>{
+
+if(!adsManager) return
+
+let remaining=Math.round(adsManager.getRemainingTime())
+
+timer.innerText="Реклама "+remaining+" сек"
+
+},500)
+
 }
 
 function skipAd(){
-  if(adsManager){ adsManager.stop(); }
+
+if(adsManager){
+
+adsManager.stop()
+
 }
 
-function autoNextPoster(){
-  currentPoster++;
-  if(currentPoster >= document.querySelectorAll(".card").length) currentPoster=0;
-  playAd(currentPoster);
+}
+
+function onAdError(){
+
+onAdComplete()
+
 }
 
 function toggleSound(){
-  const video = document.getElementById("video");
-  video.muted = !video.muted;
+
+let video=document.getElementById("video")
+
+video.muted=!video.muted
+
+document.getElementById("muteBtn").innerText=video.muted?"🔇":"🔊"
+
 }
 
-function onAdError(error){
-  console.log("Ad error", error);
-  onAdComplete();
+function autoNextPoster(){
+
+let posters=document.querySelectorAll(".card")
+
+currentPoster++
+
+if(currentPoster>=posters.length){
+currentPoster=0
+}
+
+posters[currentPoster].click()
+
+}
+
+function destroyAds(){
+
+if(adsManager){
+adsManager.destroy()
+adsManager=null
+}
+
+if(adsLoader){
+adsLoader=null
+}
+
 }
 
 function closePlayer(){
-  document.getElementById("playerModal").style.display="none";
-  clearInterval(timerInterval);
-  document.getElementById("skipAd").style.display="none";
-  if(adsManager){ adsManager.destroy(); adsManager=null; }
+
+destroyAds()
+
+clearInterval(timerInterval)
+
+document.getElementById("playerModal").style.display="none"
+
+document.getElementById("skipAd").style.display="none"
+
 }
+
 </script>
 
 </body>
