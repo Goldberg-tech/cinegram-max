@@ -16,7 +16,7 @@ h1 { padding:20px; margin:0; }
 #videoContainer { width:100%; max-width:900px; position:relative; }
 video { width:100%; height:auto; background:black; }
 .close { position:absolute; top:20px; right:25px; font-size:35px; cursor:pointer; z-index:10000; }
-#adText { margin-bottom:10px; font-size:18px; }
+#adText { margin-bottom:10px; font-size:18px; color:white; }
 #skipAd { position:absolute; bottom:20px; right:20px; background:#ff0000; border:none; padding:10px 16px; color:white; border-radius:8px; display:none; z-index:9999; }
 #soundBtn { position:absolute; top:20px; right:20px; background:black; color:white; border:none; padding:8px 12px; border-radius:6px; z-index:9999; }
 </style>
@@ -48,10 +48,10 @@ const video = document.getElementById("video");
 const playerModal = document.getElementById("playerModal");
 let adIndex = 0;
 const maxAds = 3;
-let adsList = []; // сюда будут попадать тестовые mp4
+let adsList = []; // сюда mp4
 let currentAd = null;
 
-// Генерация cachebuster
+// cachebuster
 function generateCachebuster(){ return Date.now() + Math.floor(Math.random()*1000000); }
 
 function playAd(){
@@ -63,7 +63,7 @@ function playAd(){
     loadAds();
 }
 
-// Вставляем тестовые mp4 ссылки вместо VAST
+// добавьте реальные mp4 ссылки здесь
 function loadAds(){
     adsList = [];
     for(let i=0;i<maxAds;i++){
