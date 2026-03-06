@@ -1,49 +1,56 @@
 <!DOCTYPE html>
 <html lang="ru">
 <head>
-<meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Wink VAST MiniApp</title>
-<style>
-body {margin:0; background:#000; display:flex; justify-content:center; align-items:center; height:100vh;}
-#wink-player {width:100%; max-width:420px; height:236px;}
-button {position:absolute; bottom:20px; left:50%; transform:translateX(-50%); padding:12px 20px; font-size:16px; background:#0088cc; color:white; border:none; border-radius:8px; cursor:pointer;}
-</style>
+  <meta charset="UTF-8">
+  <title>TMA Wink VAST Test</title>
+  <style>
+    body, html {
+      margin: 0; padding: 0;
+      width: 100%; height: 100%;
+      display: flex; justify-content: center; align-items: center;
+      background: #000;
+    }
+    #player-container {
+      width: 360px;
+      height: 640px;
+      position: relative;
+    }
+    #fullscreen-btn {
+      position: absolute;
+      bottom: 10px;
+      right: 10px;
+      padding: 6px 12px;
+      background: rgba(255,255,255,0.8);
+      border: none;
+      border-radius: 4px;
+      cursor: pointer;
+      font-weight: bold;
+    }
+  </style>
 </head>
 <body>
 
-<div id="wink-player"></div>
-<button id="playAdBtn">Смотреть рекламу</button>
+<div id="player-container">
+  <iframe id="vast-frame"
+    src="https://ssp.wink.ru/v1/rt/avod/vast?ad_place_type=preroll&age_value=18&broadcast_type=ott&client_id=123456789&client_version=&domain=TMA&embedded=P5&is_child=false&is_paid=0&location=100001&san=web_vast_code&ad_position=1&content_id=23080&device_type=NCWEB&web_client_type=mobile"
+    width="100%" height="100%" frameborder="0" allowfullscreen>
+  </iframe>
+  <button id="fullscreen-btn">FullScreen</button>
+</div>
 
-<script src="https://static-adtech.wink.ru/embed-sdk/winkembed.umd.js"></script>
 <script>
-const container = document.getElementById("wink-player");
-const playBtn = document.getElementById("playAdBtn");
+  const container = document.getElementById('player-container');
+  const btn = document.getElementById('fullscreen-btn');
 
-function getUID() {
-  return window.Telegram?.WebApp?.initDataUnsafe?.user?.id || 'web_'+Math.random().toString(36).substring(2);
-}
-function getDomain() { return location.hostname; }
-
-function buildFrameOptions() {
-  const uid = getUID();
-  const domain = getDomain();
-  return {
-    trackId: 23080,      // ID контента / плейсхолдер для рекламы
-    partnerId: 'P0',
-    frameOptions: { width: "100%", height: "236px", allowFullscreen: true },
-    params: {
-      client_id: uid,
-      domain: domain,
-      web_client_type: "mobile"
+  btn.addEventListener('click', () => {
+    if (container.requestFullscreen) {
+      container.requestFullscreen();
+    } else if (container.webkitRequestFullscreen) { /* Safari */
+      container.webkitRequestFullscreen();
+    } else if (container.msRequestFullscreen) { /* IE11 */
+      container.msRequestFullscreen();
     }
-  };
-}
-
-playBtn.onclick = () => {
-  playBtn.style.display = "none";
-  WinkEmbedSDK.api.insertFrame(container, buildFrameOptions());
-};
+  });
 </script>
 
 </body>
