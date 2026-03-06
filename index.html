@@ -171,126 +171,78 @@ cursor:pointer;
 
 <script>
 
-/* GLOBAL */
-
-let adDisplayContainer=null
-let adsLoader=null
-let adsManager=null
-
-let adCount=0
-let maxAds=3
-
-let timerInterval=null
-
-/* OPEN PLAYER */
+let adDisplayContainer
+let adsLoader
+let adsManager
 
 function playAd(){
 
-adCount=0
+document.getElementById("playerModal").style.display="flex"
 
-const modal=document.getElementById("playerModal")
+let video = document.getElementById("video")
+let adContainer = document.getElementById("adContainer")
 
-modal.style.display="flex"
+adContainer.innerHTML=""
 
-/* IMPORTANT — задержка WebView gesture lock */
-setTimeout(()=>{
+let uid = localStorage.getItem("uid")
 
-let video=document.getElementById("video")
-
-video.pause()
-video.currentTime=0
-video.muted=true
-
-if(!adDisplayContainer){
-
-adDisplayContainer=new google.ima.AdDisplayContainer(
-document.getElementById("adContainer"),
-video
-)
-
+if(!uid){
+uid = "uid"+Math.floor(Math.random()*999999999)
+localStorage.setItem("uid", uid)
 }
 
-try{
-adDisplayContainer.initialize()
-}catch(e){
-console.log(e)
-}
+let device = /Android|iPhone/i.test(navigator.userAgent) ? "mobile" : "desktop"
 
-startAdRequest()
+let domain = window.location.hostname
 
-},100)
+let vastUrl =
+"https://ssp.wink.ru/v1/rt/avod/vast?ad_place_type=preroll"
++"&age_value=18"
++"&broadcast_type=ott"
++"&client_id="+uid
++"&client_version="
++"&domain="+domain
++"&embedded=P5"
++"&is_child=false"
++"&is_paid=0"
++"&location=100001"
++"&san=web_vast_code"
++"&ad_position=1"
++"&content_id=23080"
++"&device_type=NCWEB"
++"&web_client_type="+device
 
-}
+adDisplayContainer = new google.ima.AdDisplayContainer(adContainer, video)
 
-/* AD REQUEST */
-
-function startAdRequest(){
-
-let video=document.getElementById("video")
-
-if(!adsLoader){
-
-adsLoader=new google.ima.AdsLoader(adDisplayContainer)
+adsLoader = new google.ima.AdsLoader(adDisplayContainer)
 
 adsLoader.addEventListener(
 google.ima.AdsManagerLoadedEvent.Type.ADS_MANAGER_LOADED,
-onAdsManagerLoaded
-)
+onAdsManagerLoaded,
+false)
 
 adsLoader.addEventListener(
 google.ima.AdErrorEvent.Type.AD_ERROR,
-onAdError
-)
+onAdError,
+false)
 
-}
+let adsRequest = new google.ima.AdsRequest()
 
-let uid=localStorage.getItem("uid")
-
-if(!uid){
-uid="uid"+Math.floor(Math.random()*999999999)
-localStorage.setItem("uid",uid)
-}
-
-let device=/Android|iPhone/i.test(navigator.userAgent)?"mobile":"desktop"
-
-let vastUrl=
-"https://ssp.wink.ru/v1/rt/avod/vast?ad_place_type=preroll"
-+"&client_id="+uid
-+"&domain="+window.location.hostname
-+"&cb="+Date.now()
-
-let adsRequest=new google.ima.AdsRequest()
-
-adsRequest.adTagUrl=vastUrl
-adsRequest.linearAdSlotWidth=window.innerWidth
-adsRequest.linearAdSlotHeight=window.innerHeight
+adsRequest.adTagUrl = vastUrl
+adsRequest.linearAdSlotWidth = window.innerWidth
+adsRequest.linearAdSlotHeight = window.innerHeight
 
 adsLoader.requestAds(adsRequest)
 
-}
+adDisplayContainer.initialize()
 
-/* ADS LOADED */
+}
 
 function onAdsManagerLoaded(event){
 
-if(adsManager){
-adsManager.destroy()
-adsManager=null
-}
+let video = document.getElementById("video")
 
-let video=document.getElementById("video")
-
-adsManager=event.getAdsManager(video)
-
-adsManager.addEventListener(
-google.ima.AdEvent.Type.COMPLETE,
-onAdComplete
-)
-
-adsManager.addEventListener(
-google.ima.AdEvent.Type.STARTED,
-startAdTimer
-)
+adsManager = event.getAdsManager(video)
 
 adsManager.init(
 window.innerWidth,
@@ -302,59 +254,9 @@ adsManager.start()
 
 }
 
-/* EVENTS */
+function onAdError(error){
 
-function onAdComplete(){
-
-clearInterval(timerInterval)
-
-document.getElementById("skipAd").style.display="none"
-
-adCount++
-
-if(adCount<maxAds){
-
-setTimeout(startAdRequest,300)
-
-}else{
-
-closePlayer()
-
-}
-
-}
-
-function startAdTimer(){
-
-setTimeout(()=>{
-document.getElementById("skipAd").style.display="block"
-},5000)
-
-timerInterval=setInterval(()=>{
-
-if(!adsManager) return
-
-let remaining=Math.max(0,Math.round(adsManager.getRemainingTime()))
-
-document.getElementById("adTimer").innerText="Реклама: "+remaining+" сек"
-
-},500)
-
-}
-
-function skipAd(){
-
-if(adsManager){
-adsManager.destroy()
-adsManager=null
-}
-
-onAdComplete()
-}
-
-function onAdError(e){
-
-console.log("Ad error",e)
+console.log("Ad error", error)
 
 closePlayer()
 
@@ -364,13 +266,9 @@ function closePlayer(){
 
 document.getElementById("playerModal").style.display="none"
 
-clearInterval(timerInterval)
-
-document.getElementById("skipAd").style.display="none"
-
 if(adsManager){
 adsManager.destroy()
-adsManager=null
+adsManager = null
 }
 
 }
