@@ -1,3 +1,4 @@
+код:
 <!DOCTYPE html>
 <html lang="ru">
 
@@ -304,11 +305,6 @@ adCount++
 
 if(adCount < maxAds){
 
-if(adsManager){
-adsManager.destroy()
-adsManager = null
-}
-
 startAdRequest()
 
 }else{
@@ -349,24 +345,9 @@ clearInterval(timerInterval)
 
 function skipAd(){
 
-clearInterval(timerInterval)
-
-document.getElementById("skipAd").style.display="none"
-
-adCount++
-
-if(adCount < maxAds){
-
 if(adsManager){
-adsManager.destroy()
-adsManager = null
-}
 
-startAdRequest()
-
-}else{
-
-closePlayer()
+adsManager.stop()
 
 }
 
@@ -398,4 +379,5 @@ adsManager = null
 </script>
 
 </body>
+
 </html>
