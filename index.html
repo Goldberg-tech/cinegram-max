@@ -7,60 +7,60 @@
 
 <style>
 html,body{
-    margin:0;
-    padding:0;
-    background:black;
-    height:100%;
-    overflow:hidden;
-    font-family:Arial;
+margin:0;
+padding:0;
+background:black;
+height:100%;
+overflow:hidden;
+font-family:Arial;
 }
 
 video{
-    width:100%;
-    height:100%;
-    object-fit:contain;
-    background:black;
+width:100%;
+height:100%;
+object-fit:contain;
+background:black;
 }
 
 #loader{
-    position:absolute;
-    top:50%;
-    left:50%;
-    transform:translate(-50%,-50%);
-    color:white;
+position:absolute;
+top:50%;
+left:50%;
+transform:translate(-50%,-50%);
+color:white;
 }
 
 #skipBtn{
-    position:absolute;
-    top:20px;
-    right:20px;
-    background:rgba(0,0,0,.6);
-    color:white;
-    padding:8px 14px;
-    border-radius:6px;
-    display:none;
-    cursor:pointer;
-    z-index:10;
+position:absolute;
+top:20px;
+right:20px;
+background:rgba(0,0,0,.6);
+color:white;
+padding:8px 14px;
+border-radius:6px;
+display:none;
+cursor:pointer;
+z-index:10;
 }
 
 #muteBtn{
-    position:absolute;
-    bottom:20px;
-    right:20px;
-    background:rgba(0,0,0,.6);
-    color:white;
-    padding:8px 14px;
-    border-radius:6px;
-    cursor:pointer;
-    z-index:10;
+position:absolute;
+bottom:20px;
+right:20px;
+background:rgba(0,0,0,.6);
+color:white;
+padding:8px 14px;
+border-radius:6px;
+cursor:pointer;
+z-index:10;
 }
 
 #clickLayer{
-    position:absolute;
-    top:0;
-    left:0;
-    width:100%;
-    height:100%;
+position:absolute;
+top:0;
+left:0;
+width:100%;
+height:100%;
 }
 </style>
 </head>
@@ -85,180 +85,203 @@ const skipBtn = document.getElementById("skipBtn");
 const muteBtn = document.getElementById("muteBtn");
 const clickLayer = document.getElementById("clickLayer");
 
-/* ================= DEVICE / DOMAIN ================= */
+/* DEVICE */
 
 const deviceId = localStorage.device_id ||
-    (localStorage.device_id = crypto.randomUUID());
+(localStorage.device_id = crypto.randomUUID());
 
 const domain = window.location.hostname;
 
-/* ================= SSP VAST TEMPLATE ================= */
+/* VAST */
 
-const VAST_URL = `https://ssp.wink.ru/v1/rt/avod/vast?ad_place_type=preroll&age_value=18&broadcast_type=ott&client_id=${deviceId}&client_version=&domain=${domain}&embedded=P5&is_child=false&is_paid=0&location=100001&san=web_vast_code&ad_position=1&content_id=23080&device_type=NCWEB&web_client_type=mobile`.replace(/\s+/g,'');
+const VAST_URL =
+`https://ssp.wink.ru/v1/rt/avod/vast?ad_place_type=preroll&age_value=18&broadcast_type=ott&client_id=${deviceId}&client_version=&domain=${domain}&embedded=P5&is_child=false&is_paid=0&location=100001&san=web_vast_code&ad_position=1&content_id=23080&device_type=NCWEB&web_client_type=mobile`;
 
-/* ================= STATE ================= */
+/* STATE */
 
 let tracking = {};
 let clickThroughUrl = null;
 let quartiles = {};
 let skipAvailable = false;
 
-/* ================= FETCH ================= */
+/* ===== CORS PROXY ===== */
+
+function buildProxyUrl(url){
+
+const proxy = "https://corsproxy.io/?";
+
+return proxy + encodeURIComponent(url);
+
+}
+
+/* FETCH VAST */
 
 async function fetchVast(url, depth=0){
 
-    if(depth>5) throw "wrapper depth";
+if(depth>5) throw "wrapper depth";
 
-    const res = await fetch(url);
-    const text = await res.text();
+const res = await fetch(buildProxyUrl(url));
 
-    const xml = new DOMParser().parseFromString(text,"text/xml");
+const text = await res.text();
 
-    const wrapper = xml.querySelector("Wrapper VASTAdTagURI");
+const xml = new DOMParser().parseFromString(text,"text/xml");
 
-    if(wrapper){
-        return fetchVast(wrapper.textContent.trim(), depth+1);
-    }
+const wrapper = xml.querySelector("Wrapper VASTAdTagURI");
 
-    return xml;
+if(wrapper){
+
+return fetchVast(wrapper.textContent.trim(), depth+1);
+
 }
 
-/* ================= TRACKING ================= */
+return xml;
+
+}
+
+/* TRACKING */
 
 function fireTracking(event){
 
-    if(!tracking[event]) return;
+if(!tracking[event]) return;
 
-    tracking[event].forEach(url=>{
-        fetch(url).catch(()=>{});
-    });
+tracking[event].forEach(url=>{
+fetch(url).catch(()=>{});
+});
 
 }
 
-/* ================= FLOW ================= */
+/* FLOW */
 
 function finishAdFlow(){
 
-    video.pause();
-    video.currentTime = 0;
+video.pause();
+video.currentTime = 0;
 
-    skipAvailable=false;
-    skipBtn.style.display="none";
+skipAvailable=false;
+skipBtn.style.display="none";
 
-    loader.style.display="block";
-    loader.innerText="Загрузка рекламы...";
+loader.style.display="block";
+loader.innerText="Загрузка рекламы...";
 
-    setTimeout(loadVast,300);
+setTimeout(loadVast,300);
+
 }
 
-/* ================= LOAD VAST ================= */
+/* LOAD VAST */
 
 async function loadVast(){
 
-    try{
+try{
 
-        const xml = await fetchVast(VAST_URL);
+const xml = await fetchVast(VAST_URL);
 
-        const mediaFile = xml.querySelector("MediaFile");
+const mediaFile = xml.querySelector("MediaFile");
 
-        if(!mediaFile){
-            loader.innerText="Реклама завершена";
-            return;
-        }
-
-        video.src = mediaFile.textContent.trim();
-        video.load();
-
-        tracking = {};
-        clickThroughUrl = null;
-        quartiles = {};
-
-        xml.querySelectorAll("Tracking").forEach(node=>{
-            const ev = node.getAttribute("event");
-            if(!tracking[ev]) tracking[ev]=[];
-            tracking[ev].push(node.textContent.trim());
-        });
-
-        const imp = xml.querySelector("Impression");
-        if(imp) tracking.impression=[imp.textContent.trim()];
-
-        const clickNode = xml.querySelector("ClickThrough");
-        if(clickNode) clickThroughUrl = clickNode.textContent.trim();
-
-        loader.style.display="none";
-
-        video.muted=true;
-
-        try{
-            await video.play();
-        }catch(e){}
-
-    }catch(e){
-        loader.innerText="Реклама завершена";
-    }
+if(!mediaFile){
+loader.innerText="Реклама завершена";
+return;
 }
 
-/* ================= EVENTS ================= */
+video.src = mediaFile.textContent.trim();
+video.load();
+
+tracking = {};
+clickThroughUrl = null;
+quartiles = {};
+
+xml.querySelectorAll("Tracking").forEach(node=>{
+const ev = node.getAttribute("event");
+if(!tracking[ev]) tracking[ev]=[];
+tracking[ev].push(node.textContent.trim());
+});
+
+const imp = xml.querySelector("Impression");
+if(imp) tracking.impression=[imp.textContent.trim()];
+
+const clickNode = xml.querySelector("ClickThrough");
+if(clickNode) clickThroughUrl = clickNode.textContent.trim();
+
+loader.style.display="none";
+
+video.muted=true;
+
+try{
+await video.play();
+}catch(e){}
+
+}catch(e){
+
+loader.innerText="Реклама завершена";
+
+}
+
+}
+
+/* EVENTS */
 
 video.addEventListener("ended",()=>{
-    fireTracking("complete");
-    finishAdFlow();
+
+fireTracking("complete");
+finishAdFlow();
+
 });
 
 video.addEventListener("timeupdate",()=>{
 
-    if(!video.duration) return;
+if(!video.duration) return;
 
-    const p = video.currentTime / video.duration;
+const p = video.currentTime / video.duration;
 
-    if(video.currentTime>=5 && !skipAvailable){
-        skipAvailable=true;
-        skipBtn.style.display="block";
-    }
+if(video.currentTime>=5 && !skipAvailable){
 
-    if(p>=0.25 && !quartiles.q1){
-        quartiles.q1=true;
-        fireTracking("firstQuartile");
-    }
+skipAvailable=true;
+skipBtn.style.display="block";
 
-    if(p>=0.5 && !quartiles.q2){
-        quartiles.q2=true;
-        fireTracking("midpoint");
-    }
+}
 
-    if(p>=0.75 && !quartiles.q3){
-        quartiles.q3=true;
-        fireTracking("thirdQuartile");
-    }
+if(p>=0.25 && !quartiles.q1){
+quartiles.q1=true;
+fireTracking("firstQuartile");
+}
+
+if(p>=0.5 && !quartiles.q2){
+quartiles.q2=true;
+fireTracking("midpoint");
+}
+
+if(p>=0.75 && !quartiles.q3){
+quartiles.q3=true;
+fireTracking("thirdQuartile");
+}
 
 });
 
-/* ================= CONTROLS ================= */
+/* CONTROLS */
 
 skipBtn.onclick=()=>{
-    fireTracking("skip");
-    finishAdFlow();
+fireTracking("skip");
+finishAdFlow();
 };
 
 muteBtn.onclick=()=>{
-    video.muted=!video.muted;
-    muteBtn.innerText = video.muted ? "🔇" : "🔊";
+video.muted=!video.muted;
+muteBtn.innerText = video.muted ? "🔇" : "🔊";
 };
 
-/* ================= CLICK ================= */
+/* CLICK */
 
 clickLayer.onclick=()=>{
 
-    if(!clickThroughUrl) return;
+if(!clickThroughUrl) return;
 
-    fireTracking("click");
+fireTracking("click");
 
-    if(tg) tg.openLink(clickThroughUrl);
-    else window.open(clickThroughUrl,"_blank");
+if(tg) tg.openLink(clickThroughUrl);
+else window.open(clickThroughUrl,"_blank");
 
 };
 
-/* ================= START ================= */
+/* START */
 
 loadVast();
 
