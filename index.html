@@ -5,6 +5,7 @@
 
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
+
 <title>Кинотеатр</title>
 
 <script src="https://imasdk.googleapis.com/js/sdkloader/ima3.js"></script>
@@ -127,7 +128,7 @@ border-radius:8px;
 
 <h1>Сериалы</h1>
 
-<div class="vitrina" id="vitrina">
+<div class="vitrina">
 
 <div class="card" onclick="playAd(0)">
 <img src="posters/molodezhka.jpg">
@@ -161,6 +162,7 @@ border-radius:8px;
 
 </div>
 
+
 <div id="playerModal">
 
 <div id="adTopText">Просмотр начнется после рекламы</div>
@@ -183,6 +185,7 @@ border-radius:8px;
 
 </div>
 
+
 <script>
 
 let adsLoader
@@ -199,15 +202,48 @@ function playAd(index){
 currentPoster=index
 adCount=0
 
-destroyAds()
-
 document.getElementById("playerModal").style.display="flex"
 
-startAdRequest()
+initIMA()
+
+requestAd()
 
 }
 
-function deviceUID(){
+function initIMA(){
+
+let video=document.getElementById("video")
+let adContainer=document.getElementById("adContainer")
+
+adDisplayContainer=new google.ima.AdDisplayContainer(adContainer,video)
+adsLoader=new google.ima.AdsLoader(adDisplayContainer)
+
+adsLoader.addEventListener(
+google.ima.AdsManagerLoadedEvent.Type.ADS_MANAGER_LOADED,
+onAdsManagerLoaded)
+
+adsLoader.addEventListener(
+google.ima.AdErrorEvent.Type.AD_ERROR,
+onAdError)
+
+adDisplayContainer.initialize()
+
+}
+
+function requestAd(){
+
+let adsRequest=new google.ima.AdsRequest()
+
+adsRequest.adTagUrl=vastURL()
+
+adsRequest.linearAdSlotWidth=window.innerWidth
+adsRequest.linearAdSlotHeight=window.innerHeight
+
+adsLoader.requestAds(adsRequest)
+
+}
+
+function vastURL(){
 
 let uid=localStorage.getItem("uid")
 
@@ -216,14 +252,8 @@ uid="uid"+Math.floor(Math.random()*999999999)
 localStorage.setItem("uid",uid)
 }
 
-return uid
-
-}
-
-function vastURL(){
-
-let uid=deviceUID()
 let domain=location.hostname
+
 let device=/Android|iPhone/i.test(navigator.userAgent)?"mobile":"desktop"
 
 return "https://ssp.wink.ru/v1/rt/avod/vast?ad_place_type=preroll"
@@ -245,39 +275,6 @@ return "https://ssp.wink.ru/v1/rt/avod/vast?ad_place_type=preroll"
 
 }
 
-function startAdRequest(){
-
-destroyAds()
-
-let video=document.getElementById("video")
-let adContainer=document.getElementById("adContainer")
-
-adDisplayContainer=new google.ima.AdDisplayContainer(adContainer,video)
-
-adsLoader=new google.ima.AdsLoader(adDisplayContainer)
-
-adsLoader.addEventListener(
-google.ima.AdsManagerLoadedEvent.Type.ADS_MANAGER_LOADED,
-onAdsManagerLoaded
-)
-
-adsLoader.addEventListener(
-google.ima.AdErrorEvent.Type.AD_ERROR,
-onAdError
-)
-
-let adsRequest=new google.ima.AdsRequest()
-
-adsRequest.adTagUrl=vastURL()
-adsRequest.linearAdSlotWidth=window.innerWidth
-adsRequest.linearAdSlotHeight=window.innerHeight
-
-adsLoader.requestAds(adsRequest)
-
-adDisplayContainer.initialize()
-
-}
-
 function onAdsManagerLoaded(event){
 
 let video=document.getElementById("video")
@@ -287,20 +284,37 @@ adsManager=event.getAdsManager(video)
 adsManager.init(
 window.innerWidth,
 window.innerHeight,
-google.ima.ViewMode.NORMAL
-)
+google.ima.ViewMode.NORMAL)
 
 adsManager.start()
 
 adsManager.addEventListener(
 google.ima.AdEvent.Type.COMPLETE,
-onAdComplete
-)
+onAdComplete)
 
 adsManager.addEventListener(
 google.ima.AdEvent.Type.STARTED,
-startAdTimer
-)
+startTimer)
+
+}
+
+function startTimer(){
+
+let timer=document.getElementById("adTimer")
+
+setTimeout(()=>{
+document.getElementById("skipAd").style.display="block"
+},5000)
+
+timerInterval=setInterval(()=>{
+
+if(!adsManager)return
+
+let remaining=Math.round(adsManager.getRemainingTime())
+
+timer.innerText="Реклама "+remaining+" сек"
+
+},500)
 
 }
 
@@ -314,7 +328,7 @@ adCount++
 
 if(adCount<maxAds){
 
-startAdRequest()
+requestAd()
 
 }else{
 
@@ -325,31 +339,13 @@ autoNextPoster()
 
 }
 
-function startAdTimer(){
-
-let timer=document.getElementById("adTimer")
-
-setTimeout(()=>{
-document.getElementById("skipAd").style.display="block"
-},5000)
-
-timerInterval=setInterval(()=>{
-
-if(!adsManager) return
-
-let remaining=Math.round(adsManager.getRemainingTime())
-
-timer.innerText="Реклама "+remaining+" сек"
-
-},500)
-
-}
-
 function skipAd(){
 
 if(adsManager){
 
 adsManager.stop()
+
+onAdComplete()
 
 }
 
@@ -385,28 +381,16 @@ posters[currentPoster].click()
 
 }
 
-function destroyAds(){
-
-if(adsManager){
-adsManager.destroy()
-adsManager=null
-}
-
-if(adsLoader){
-adsLoader=null
-}
-
-}
-
 function closePlayer(){
-
-destroyAds()
 
 clearInterval(timerInterval)
 
 document.getElementById("playerModal").style.display="none"
 
-document.getElementById("skipAd").style.display="none"
+if(adsManager){
+adsManager.destroy()
+adsManager=null
+}
 
 }
 
