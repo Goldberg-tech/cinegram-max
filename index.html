@@ -1,191 +1,382 @@
 <!DOCTYPE html>
 <html lang="ru">
+
 <head>
+
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
+
 <title>Кинотеатр</title>
+
 <script src="https://imasdk.googleapis.com/js/sdkloader/ima3.js"></script>
+
 <style>
-body{margin:0;background:#0f0f0f;color:white;font-family:Arial;}
-h1{padding:20px;margin:0;}
-.vitrina{display:flex;gap:20px;overflow-x:auto;padding:20px;}
-.vitrina::-webkit-scrollbar{display:none;}
-.card{min-width:65vw;cursor:pointer;}
-.card img{width:65vw;height:90vw;object-fit:cover;border-radius:20px;}
-.title{margin-top:10px;font-size:18px;}
-#playerModal{position:fixed;top:0;left:0;width:100%;height:100%;background:black;display:none;align-items:center;justify-content:center;z-index:9999;flex-direction:column;}
-#message{margin-bottom:10px;font-size:18px;}
-#videoContainer{width:100%;max-width:900px;position:relative;}
-video{width:100%;}
-.close{position:absolute;top:20px;right:25px;font-size:35px;cursor:pointer;z-index:10000;}
-#skipAd{position:absolute;bottom:20px;right:20px;background:red;border:none;padding:10px 15px;color:white;border-radius:8px;display:none;z-index:9999;}
-#timer{position:absolute;bottom:20px;left:20px;background:rgba(0,0,0,0.6);padding:6px 10px;border-radius:6px;}
-#soundBtn{position:absolute;top:20px;right:20px;background:black;color:white;border:none;padding:8px 12px;border-radius:6px;z-index:9999;}
+
+body{
+margin:0;
+background:#0f0f0f;
+color:white;
+font-family:Arial;
+}
+
+h1{
+padding:20px;
+margin:0;
+}
+
+.vitrina{
+display:flex;
+gap:20px;
+overflow-x:auto;
+padding:20px;
+}
+
+.vitrina::-webkit-scrollbar{
+display:none;
+}
+
+.card{
+min-width:65vw;
+cursor:pointer;
+}
+
+.card img{
+width:65vw;
+height:90vw;
+object-fit:cover;
+border-radius:20px;
+}
+
+.title{
+margin-top:10px;
+font-size:18px;
+}
+
+#playerModal{
+position:fixed;
+top:0;
+left:0;
+width:100%;
+height:100%;
+background:black;
+display:none;
+align-items:center;
+justify-content:center;
+z-index:9999;
+}
+
+#videoContainer{
+width:100%;
+max-width:900px;
+position:relative;
+}
+
+video{
+width:100%;
+height:auto;
+}
+
+.close{
+position:absolute;
+top:20px;
+right:25px;
+font-size:35px;
+cursor:pointer;
+z-index:10000;
+}
+
+#adText{
+position:absolute;
+top:20px;
+left:20px;
+background:rgba(0,0,0,0.6);
+padding:10px 15px;
+border-radius:10px;
+z-index:9999;
+}
+
+#adTimer{
+position:absolute;
+bottom:20px;
+left:20px;
+background:rgba(0,0,0,0.6);
+padding:8px 12px;
+border-radius:8px;
+font-size:14px;
+z-index:9999;
+}
+
+#skipAd{
+position:absolute;
+bottom:20px;
+right:20px;
+background:#ff0000;
+border:none;
+padding:10px 16px;
+color:white;
+border-radius:8px;
+display:none;
+z-index:9999;
+}
+
 </style>
+
 </head>
+
 <body>
+
 <h1>Сериалы</h1>
 
 <div class="vitrina">
-<div class="card" onclick="startCinema(0)"><img src="posters/molodezhka.jpg"><div class="title">Молодежка</div></div>
-<div class="card" onclick="startCinema(1)"><img src="posters/kuhnya.jpg"><div class="title">Кухня</div></div>
-<div class="card" onclick="startCinema(2)"><img src="posters/grand.jpg"><div class="title">Гранд</div></div>
-<div class="card" onclick="startCinema(3)"><img src="posters/deti-peremen.jpg"><div class="title">Дети перемен</div></div>
-<div class="card" onclick="startCinema(4)"><img src="posters/slovo-pacana.jpg"><div class="title">Слово пацана</div></div>
-<div class="card" onclick="startCinema(5)"><img src="posters/obnalshik.jpg"><div class="title">Обнальщик</div></div>
+
+<div class="card" onclick="playAd()">
+<img src="posters/molodezhka.jpg">
+<div class="title">Молодежка</div>
+</div>
+
+<div class="card" onclick="playAd()">
+<img src="posters/kuhnya.jpg">
+<div class="title">Кухня</div>
+</div>
+
+<div class="card" onclick="playAd()">
+<img src="posters/grand.jpg">
+<div class="title">Гранд</div>
+</div>
+
+<div class="card" onclick="playAd()">
+<img src="posters/deti-peremen.jpg">
+<div class="title">Дети перемен</div>
+</div>
+
+<div class="card" onclick="playAd()">
+<img src="posters/slovo-pacana.jpg">
+<div class="title">Слово пацана</div>
+</div>
+
+<div class="card" onclick="playAd()">
+<img src="posters/obnalshik.jpg">
+<div class="title">Обнальщик</div>
+</div>
+
 </div>
 
 <div id="playerModal">
+
 <div class="close" onclick="closePlayer()">×</div>
-<div id="message">Просмотр начнется после рекламы</div>
+
 <div id="videoContainer">
-<button id="soundBtn" onclick="toggleSound()">🔊</button>
-<video id="video" playsinline muted></video>
+
+<div id="adText">Просмотр начнется после рекламы</div>
+
+<video id="video" playsinline autoplay></video>
+
 <div id="adContainer"></div>
-<div id="timer"></div>
+
+<div id="adTimer"></div>
+
 <button id="skipAd" onclick="skipAd()">Пропустить</button>
+
 </div>
+
 </div>
 
 <script>
-let adsLoader, adsManager, adDisplayContainer;
-let adIndex = 0, prerollCount = 3;
-let currentPoster = 0;
-let timerInterval, midrollTimer;
-const posters = document.querySelectorAll(".card");
 
-// запуск по клику
-function startCinema(index){
-  currentPoster = index;
-  document.getElementById("playerModal").style.display = "flex";
-  document.getElementById("message").innerText = "Просмотр начнется после рекламы";
-  resetAds();
-  prepareVideoAndAd();
+let adDisplayContainer
+let adsLoader
+let adsManager
+
+let adCount = 0
+let maxAds = 3
+
+let timerInterval
+
+function playAd(){
+
+adCount = 0
+
+document.getElementById("playerModal").style.display="flex"
+
+let video = document.getElementById("video")
+let adContainer = document.getElementById("adContainer")
+
+adContainer.innerHTML=""
+
+startAdRequest()
+
 }
 
-// сброс AdsManager
-function resetAds(){
-  if(adsManager){ adsManager.destroy(); adsManager = null; }
-  clearInterval(timerInterval);
-  clearTimeout(midrollTimer);
-  adIndex = 0;
+function startAdRequest(){
+
+let video = document.getElementById("video")
+let adContainer = document.getElementById("adContainer")
+
+let uid = localStorage.getItem("uid")
+
+if(!uid){
+uid = "uid"+Math.floor(Math.random()*999999999)
+localStorage.setItem("uid", uid)
 }
 
-// подготовка видео и контейнера перед AdsLoader
-function prepareVideoAndAd(){
-  const video = document.getElementById("video");
-  video.pause();
-  video.removeAttribute("src");
-  video.load();
+let device = /Android|iPhone/i.test(navigator.userAgent) ? "mobile" : "desktop"
 
-  // init AdDisplayContainer строго после клика
-  adDisplayContainer = new google.ima.AdDisplayContainer(document.getElementById("adContainer"), video);
-  adDisplayContainer.initialize();
+let domain = window.location.hostname
 
-  // start playback после user interaction
-  video.play().then(()=> requestAd());
+let vastUrl =
+"https://ssp.wink.ru/v1/rt/avod/vast?ad_place_type=preroll"
++"&age_value=18"
++"&broadcast_type=ott"
++"&client_id="+uid
++"&client_version="
++"&domain="+domain
++"&embedded=P5"
++"&is_child=false"
++"&is_paid=0"
++"&location=100001"
++"&san=web_vast_code"
++"&ad_position=1"
++"&content_id=23080"
++"&device_type=NCWEB"
++"&web_client_type="+device
++"&cb="+Date.now()
++"&rnd="+Math.floor(Math.random()*1000000000)
+
+adDisplayContainer = new google.ima.AdDisplayContainer(adContainer, video)
+
+adsLoader = new google.ima.AdsLoader(adDisplayContainer)
+
+adsLoader.addEventListener(
+google.ima.AdsManagerLoadedEvent.Type.ADS_MANAGER_LOADED,
+onAdsManagerLoaded,
+false)
+
+adsLoader.addEventListener(
+google.ima.AdErrorEvent.Type.AD_ERROR,
+onAdError,
+false)
+
+let adsRequest = new google.ima.AdsRequest()
+
+adsRequest.adTagUrl = vastUrl
+adsRequest.linearAdSlotWidth = window.innerWidth
+adsRequest.linearAdSlotHeight = window.innerHeight
+
+adsLoader.requestAds(adsRequest)
+
+adDisplayContainer.initialize()
+
 }
 
-// запрос preroll/midroll
-function requestAd(){
-  const video = document.getElementById("video");
-  const adContainer = document.getElementById("adContainer");
-  adContainer.innerHTML = "";
-
-  const uid = localStorage.getItem("uid") || ("uid"+Math.floor(Math.random()*999999999));
-  localStorage.setItem("uid", uid);
-  const device = /Android|iPhone/i.test(navigator.userAgent)?"mobile":"desktop";
-  const domain = window.location.hostname;
-
-  const vastUrl = "https://ssp.wink.ru/v1/rt/avod/vast?ad_place_type=preroll"
-    +"&age_value=18"
-    +"&broadcast_type=ott"
-    +"&client_id="+uid
-    +"&domain="+domain
-    +"&device_type=NCWEB"
-    +"&web_client_type="+device
-    +"&cb="+Date.now()
-    +"&rnd="+Math.floor(Math.random()*9999999);
-
-  adsLoader = new google.ima.AdsLoader(adDisplayContainer);
-  adsLoader.addEventListener(google.ima.AdsManagerLoadedEvent.Type.ADS_MANAGER_LOADED,onAdsManagerLoaded);
-  adsLoader.addEventListener(google.ima.AdErrorEvent.Type.AD_ERROR,onAdError);
-
-  const adsRequest = new google.ima.AdsRequest();
-  adsRequest.adTagUrl = vastUrl;
-  adsRequest.linearAdSlotWidth = window.innerWidth;
-  adsRequest.linearAdSlotHeight = window.innerHeight;
-
-  adsLoader.requestAds(adsRequest);
-}
-
-// создание AdsManager и слушатели
 function onAdsManagerLoaded(event){
-  const video = document.getElementById("video");
-  adsManager = event.getAdsManager(video);
-  adsManager.init(window.innerWidth, window.innerHeight, google.ima.ViewMode.NORMAL);
-  adsManager.start();
-  adsManager.addEventListener(google.ima.AdEvent.Type.COMPLETE,nextAd);
-  adsManager.addEventListener(google.ima.AdEvent.Type.STARTED,startTimer);
+
+let video = document.getElementById("video")
+
+adsManager = event.getAdsManager(video)
+
+adsManager.init(
+window.innerWidth,
+window.innerHeight,
+google.ima.ViewMode.NORMAL
+)
+
+adsManager.start()
+
+adsManager.addEventListener(
+google.ima.AdEvent.Type.COMPLETE,
+onAdComplete
+)
+
+adsManager.addEventListener(
+google.ima.AdEvent.Type.STARTED,
+startAdTimer
+)
+
 }
 
-// таймер и skip
-function startTimer(){
-  const timer = document.getElementById("timer");
-  setTimeout(()=>{ document.getElementById("skipAd").style.display = "block"; },5000);
+function onAdComplete(){
 
-  timerInterval = setInterval(()=>{
-    if(!adsManager) return;
-    const remain = Math.round(adsManager.getRemainingTime());
-    timer.innerText = "Реклама: "+remain+" сек";
-    if(remain <=0) clearInterval(timerInterval);
-  },500);
+clearInterval(timerInterval)
+
+document.getElementById("skipAd").style.display="none"
+
+adCount++
+
+if(adCount < maxAds){
+
+startAdRequest()
+
+}else{
+
+closePlayer()
+
 }
 
-// следующий preroll
-function nextAd(){
-  clearInterval(timerInterval);
-  document.getElementById("skipAd").style.display="none";
-  adIndex++;
-  if(adIndex < prerollCount){
-    prepareVideoAndAd(); // пересоздаём AdsManager
-  } else {
-    startContent();
-  }
 }
 
-// skip
-function skipAd(){ nextAd(); }
+function startAdTimer(){
 
-// midroll через 10 секунд после контента
-function startContent(){
-  midrollTimer = setTimeout(()=>{ prepareVideoAndAd(); },10000);
-  autoNext();
+let timer = document.getElementById("adTimer")
+
+setTimeout(()=>{
+
+document.getElementById("skipAd").style.display="block"
+
+},5000)
+
+timerInterval = setInterval(()=>{
+
+if(!adsManager) return
+
+let remaining = Math.round(adsManager.getRemainingTime())
+
+timer.innerText = "Реклама: "+remaining+" сек"
+
+if(remaining <= 0){
+
+clearInterval(timerInterval)
+
 }
 
-// автопереход на следующий постер
-function autoNext(){
-  setTimeout(()=>{
-    currentPoster++;
-    if(currentPoster>=posters.length) currentPoster=0;
-    startCinema(currentPoster);
-  },20000);
+},500)
+
 }
 
-// звук
-function toggleSound(){
-  const video = document.getElementById("video");
-  video.muted = !video.muted;
+function skipAd(){
+
+if(adsManager){
+
+adsManager.stop()
+
 }
 
-// обработка ошибок
-function onAdError(){ nextAd(); }
+}
 
-// закрытие модалки
+function onAdError(error){
+
+console.log("Ad error", error)
+
+closePlayer()
+
+}
+
 function closePlayer(){
-  document.getElementById("playerModal").style.display="none";
-  resetAds();
+
+document.getElementById("playerModal").style.display="none"
+
+clearInterval(timerInterval)
+
+document.getElementById("skipAd").style.display="none"
+
+if(adsManager){
+adsManager.destroy()
+adsManager = null
 }
+
+}
+
 </script>
+
 </body>
+
 </html>
