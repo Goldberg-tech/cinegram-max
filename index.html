@@ -1,188 +1,83 @@
 <!DOCTYPE html>
 <html>
 <head>
+
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>VAST TMA Player</title>
+
+<script src="https://telegram.org/js/telegram-web-app.js"></script>
 
 <style>
-html, body {
-  margin:0;
-  padding:0;
-  background:#000;
-  height:100%;
-  overflow:hidden;
+
+body{
+margin:0;
+background:black;
 }
 
-video {
-  width:100%;
-  height:100%;
-  object-fit:contain;
-  background:#000;
+video{
+width:100vw;
+height:100vh;
+object-fit:cover;
 }
 
-#startBtn {
-  position:absolute;
-  z-index:10;
-  top:50%;
-  left:50%;
-  transform:translate(-50%, -50%);
-  padding:16px 24px;
-  font-size:18px;
-  border-radius:8px;
-  border:none;
-  background:#0088cc;
-  color:#fff;
-}
-
-#clickLayer {
-  position:absolute;
-  top:0;
-  left:0;
-  width:100%;
-  height:100%;
-  cursor:pointer;
-  display:none;
-}
 </style>
+
 </head>
+
 <body>
 
-<button id="startBtn">Смотреть рекламу</button>
-<div id="clickLayer"></div>
-<video id="adVideo" playsinline></video>
+<video id="player" autoplay muted playsinline controls></video>
 
 <script>
 
-const tg = window.Telegram?.WebApp;
-if (tg) tg.expand();
-
-const video = document.getElementById("adVideo");
-const btn = document.getElementById("startBtn");
-const clickLayer = document.getElementById("clickLayer");
-
-let tracking = {};
-let clickThroughUrl = null;
-let quartilesFired = {};
-
-// ===== Генерация device_id =====
-function getDeviceId() {
-  let id = localStorage.getItem("device_id");
-  if (!id) {
-    id = crypto.randomUUID();
-    localStorage.setItem("device_id", id);
-  }
-  return id;
-}
-
-const deviceId = getDeviceId();
-const domain = location.hostname;
-
-// ===== ТВОЙ VAST URL =====
 const vastUrl =
-`https://ssp.wink.ru/v1/rt/avod/vast?ad_place_type=preroll&age_value=18&broadcast_type=ott&client_id=${deviceId}&client_version=&domain=${domain}&embedded=P5&is_child=false&is_paid=0&location=100001&san=web_vast_code&ad_position=1&content_id=23080&device_type=NCWEB&web_client_type=mobile`;
+"https://ssp.wink.ru/v1/rt/avod/vast?ad_place_type=preroll&age_value=18&broadcast_type=ott&client_id=test123&client_version=&domain=localhost&embedded=P5&is_child=false&is_paid=0&location=100001&san=web_vast_code&ad_position=1&content_id=23080&device_type=NCWEB&web_client_type=mobile";
 
+async function loadVast(url){
 
-// ===== Загрузка VAST =====
-async function loadVast() {
-  const res = await fetch(vastUrl);
-  const xmlText = await res.text();
-  const xml = new DOMParser().parseFromString(xmlText, "text/xml");
+const res = await fetch(url);
+const text = await res.text();
 
-  // MediaFile
-  const mediaFile = xml.querySelector("MediaFile");
-  if (!mediaFile) {
-    alert("MediaFile не найден");
-    return;
-  }
+const xml = new DOMParser().parseFromString(text,"text/xml");
 
-  video.src = mediaFile.textContent.trim();
+const wrapper = xml.querySelector("VASTAdTagURI");
 
-  // Impression
-  const impression = xml.querySelector("Impression");
-  if (impression) {
-    tracking.impression = [impression.textContent.trim()];
-  }
+if(wrapper){
 
-  // Tracking events
-  xml.querySelectorAll("Tracking").forEach(node => {
-    const event = node.getAttribute("event");
-    if (!tracking[event]) tracking[event] = [];
-    tracking[event].push(node.textContent.trim());
-  });
+const next = wrapper.textContent.trim();
 
-  // ClickThrough
-  const clickNode = xml.querySelector("ClickThrough");
-  if (clickNode) {
-    clickThroughUrl = clickNode.textContent.trim();
-    clickLayer.style.display = "block";
-  }
+console.log("Wrapper ->",next);
+
+return loadVast(next);
+
 }
 
+const media = xml.querySelector("MediaFile");
 
-// ===== Отправка tracking =====
-function fireTracking(event) {
-  if (!tracking[event]) return;
+if(media){
 
-  tracking[event].forEach(url => {
-    fetch(url).catch(()=>{});
-  });
+const videoUrl = media.textContent.trim();
+
+console.log("Ad video:",videoUrl);
+
+const player = document.getElementById("player");
+
+player.src = videoUrl;
+
+player.play();
+
 }
 
+else{
 
-// ===== События видео =====
-video.addEventListener("play", () => {
-  fireTracking("impression");
-  fireTracking("start");
-});
+console.log("No media file");
 
-video.addEventListener("timeupdate", () => {
-  if (!video.duration) return;
+}
 
-  const progress = video.currentTime / video.duration;
+}
 
-  if (progress >= 0.25 && !quartilesFired.q1) {
-    quartilesFired.q1 = true;
-    fireTracking("firstQuartile");
-  }
-
-  if (progress >= 0.5 && !quartilesFired.q2) {
-    quartilesFired.q2 = true;
-    fireTracking("midpoint");
-  }
-
-  if (progress >= 0.75 && !quartilesFired.q3) {
-    quartilesFired.q3 = true;
-    fireTracking("thirdQuartile");
-  }
-});
-
-video.addEventListener("ended", () => {
-  fireTracking("complete");
-});
-
-
-// ===== Клик по рекламе =====
-clickLayer.addEventListener("click", () => {
-  if (!clickThroughUrl) return;
-
-  fireTracking("click");
-
-  if (tg) {
-    tg.openLink(clickThroughUrl);
-  } else {
-    window.open(clickThroughUrl, "_blank");
-  }
-});
-
-
-// ===== Запуск по кнопке (обязательно для TMA) =====
-btn.addEventListener("click", async () => {
-  btn.style.display = "none";
-  await loadVast();
-  await video.play();
-});
+loadVast(vastUrl);
 
 </script>
+
 </body>
 </html>
