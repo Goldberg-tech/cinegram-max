@@ -1,382 +1,111 @@
 <!DOCTYPE html>
 <html lang="ru">
-
 <head>
-
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1">
-
-<title>Кинотеатр</title>
-
-<script src="https://imasdk.googleapis.com/js/sdkloader/ima3.js"></script>
+<title>Ad Player</title>
 
 <style>
-
 body{
 margin:0;
-background:#0f0f0f;
+font-family:sans-serif;
+background:#111;
 color:white;
-font-family:Arial;
 }
 
-h1{
-padding:20px;
-margin:0;
-}
-
-.vitrina{
-display:flex;
-gap:20px;
-overflow-x:auto;
-padding:20px;
-}
-
-.vitrina::-webkit-scrollbar{
-display:none;
-}
-
-.card{
-min-width:65vw;
+#openBtn{
+margin:40px;
+padding:15px 30px;
+font-size:18px;
 cursor:pointer;
 }
 
-.card img{
-width:65vw;
-height:90vw;
-object-fit:cover;
-border-radius:20px;
-}
-
-.title{
-margin-top:10px;
-font-size:18px;
-}
-
-#playerModal{
+#playerOverlay{
 position:fixed;
 top:0;
 left:0;
 width:100%;
 height:100%;
-background:black;
+background:rgba(0,0,0,0.9);
 display:none;
 align-items:center;
 justify-content:center;
 z-index:9999;
 }
 
-#videoContainer{
-width:100%;
-max-width:900px;
+#playerBox{
 position:relative;
+width:80%;
+max-width:900px;
+background:black;
+}
+
+#closeBtn{
+position:absolute;
+top:-40px;
+right:0;
+font-size:30px;
+cursor:pointer;
 }
 
 video{
 width:100%;
 height:auto;
+display:block;
 }
-
-.close{
-position:absolute;
-top:20px;
-right:25px;
-font-size:35px;
-cursor:pointer;
-z-index:10000;
-}
-
-#adText{
-position:absolute;
-top:20px;
-left:20px;
-background:rgba(0,0,0,0.6);
-padding:10px 15px;
-border-radius:10px;
-z-index:9999;
-}
-
-#adTimer{
-position:absolute;
-bottom:20px;
-left:20px;
-background:rgba(0,0,0,0.6);
-padding:8px 12px;
-border-radius:8px;
-font-size:14px;
-z-index:9999;
-}
-
-#skipAd{
-position:absolute;
-bottom:20px;
-right:20px;
-background:#ff0000;
-border:none;
-padding:10px 16px;
-color:white;
-border-radius:8px;
-display:none;
-z-index:9999;
-}
-
 </style>
-
 </head>
 
 <body>
 
-<h1>Сериалы</h1>
+<button id="openBtn">Открыть рекламу</button>
 
-<div class="vitrina">
+<div id="playerOverlay">
+<div id="playerBox">
 
-<div class="card" onclick="playAd()">
-<img src="posters/molodezhka.jpg">
-<div class="title">Молодежка</div>
-</div>
+<div id="closeBtn">✕</div>
 
-<div class="card" onclick="playAd()">
-<img src="posters/kuhnya.jpg">
-<div class="title">Кухня</div>
-</div>
-
-<div class="card" onclick="playAd()">
-<img src="posters/grand.jpg">
-<div class="title">Гранд</div>
-</div>
-
-<div class="card" onclick="playAd()">
-<img src="posters/deti-peremen.jpg">
-<div class="title">Дети перемен</div>
-</div>
-
-<div class="card" onclick="playAd()">
-<img src="posters/slovo-pacana.jpg">
-<div class="title">Слово пацана</div>
-</div>
-
-<div class="card" onclick="playAd()">
-<img src="posters/obnalshik.jpg">
-<div class="title">Обнальщик</div>
-</div>
+<video id="adVideo" playsinline></video>
 
 </div>
-
-<div id="playerModal">
-
-<div class="close" onclick="closePlayer()">×</div>
-
-<div id="videoContainer">
-
-<div id="adText">Просмотр начнется после рекламы</div>
-
-<video id="video" playsinline autoplay></video>
-
-<div id="adContainer"></div>
-
-<div id="adTimer"></div>
-
-<button id="skipAd" onclick="skipAd()">Пропустить</button>
-
-</div>
-
 </div>
 
 <script>
 
-let adDisplayContainer
-let adsLoader
-let adsManager
+const overlay = document.getElementById("playerOverlay")
+const video = document.getElementById("adVideo")
+const openBtn = document.getElementById("openBtn")
+const closeBtn = document.getElementById("closeBtn")
 
-let adCount = 0
-let maxAds = 3
+/* ВАЖНО: вставь сюда свой рекламный файл */
+const AD_URL = "ad.mp4"
 
-let timerInterval
+openBtn.onclick = () => {
 
-function playAd(){
+overlay.style.display = "flex"
 
-adCount = 0
+video.src = AD_URL
+video.currentTime = 0
 
-document.getElementById("playerModal").style.display="flex"
-
-let video = document.getElementById("video")
-let adContainer = document.getElementById("adContainer")
-
-adContainer.innerHTML=""
-
-startAdRequest()
+video.play().catch(e=>{
+console.log("autoplay blocked",e)
+})
 
 }
 
-function startAdRequest(){
+closeBtn.onclick = () => {
 
-let video = document.getElementById("video")
-let adContainer = document.getElementById("adContainer")
-
-let uid = localStorage.getItem("uid")
-
-if(!uid){
-uid = "uid"+Math.floor(Math.random()*999999999)
-localStorage.setItem("uid", uid)
-}
-
-let device = /Android|iPhone/i.test(navigator.userAgent) ? "mobile" : "desktop"
-
-let domain = window.location.hostname
-
-let vastUrl =
-"https://ssp.wink.ru/v1/rt/avod/vast?ad_place_type=preroll"
-+"&age_value=18"
-+"&broadcast_type=ott"
-+"&client_id="+uid
-+"&client_version="
-+"&domain="+domain
-+"&embedded=P5"
-+"&is_child=false"
-+"&is_paid=0"
-+"&location=100001"
-+"&san=web_vast_code"
-+"&ad_position=1"
-+"&content_id=23080"
-+"&device_type=NCWEB"
-+"&web_client_type="+device
-+"&cb="+Date.now()
-+"&rnd="+Math.floor(Math.random()*1000000000)
-
-adDisplayContainer = new google.ima.AdDisplayContainer(adContainer, video)
-
-adsLoader = new google.ima.AdsLoader(adDisplayContainer)
-
-adsLoader.addEventListener(
-google.ima.AdsManagerLoadedEvent.Type.ADS_MANAGER_LOADED,
-onAdsManagerLoaded,
-false)
-
-adsLoader.addEventListener(
-google.ima.AdErrorEvent.Type.AD_ERROR,
-onAdError,
-false)
-
-let adsRequest = new google.ima.AdsRequest()
-
-adsRequest.adTagUrl = vastUrl
-adsRequest.linearAdSlotWidth = window.innerWidth
-adsRequest.linearAdSlotHeight = window.innerHeight
-
-adsLoader.requestAds(adsRequest)
-
-adDisplayContainer.initialize()
+video.pause()
+overlay.style.display = "none"
 
 }
 
-function onAdsManagerLoaded(event){
+video.onended = () => {
 
-let video = document.getElementById("video")
-
-adsManager = event.getAdsManager(video)
-
-adsManager.init(
-window.innerWidth,
-window.innerHeight,
-google.ima.ViewMode.NORMAL
-)
-
-adsManager.start()
-
-adsManager.addEventListener(
-google.ima.AdEvent.Type.COMPLETE,
-onAdComplete
-)
-
-adsManager.addEventListener(
-google.ima.AdEvent.Type.STARTED,
-startAdTimer
-)
-
-}
-
-function onAdComplete(){
-
-clearInterval(timerInterval)
-
-document.getElementById("skipAd").style.display="none"
-
-adCount++
-
-if(adCount < maxAds){
-
-startAdRequest()
-
-}else{
-
-closePlayer()
-
-}
-
-}
-
-function startAdTimer(){
-
-let timer = document.getElementById("adTimer")
-
-setTimeout(()=>{
-
-document.getElementById("skipAd").style.display="block"
-
-},5000)
-
-timerInterval = setInterval(()=>{
-
-if(!adsManager) return
-
-let remaining = Math.round(adsManager.getRemainingTime())
-
-timer.innerText = "Реклама: "+remaining+" сек"
-
-if(remaining <= 0){
-
-clearInterval(timerInterval)
-
-}
-
-},500)
-
-}
-
-function skipAd(){
-
-if(adsManager){
-
-adsManager.stop()
-
-}
-
-}
-
-function onAdError(error){
-
-console.log("Ad error", error)
-
-closePlayer()
-
-}
-
-function closePlayer(){
-
-document.getElementById("playerModal").style.display="none"
-
-clearInterval(timerInterval)
-
-document.getElementById("skipAd").style.display="none"
-
-if(adsManager){
-adsManager.destroy()
-adsManager = null
-}
+overlay.style.display = "none"
 
 }
 
 </script>
 
 </body>
-
 </html>
