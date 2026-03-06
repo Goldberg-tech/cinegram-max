@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>TMA Player с витриной</title>
+<title>TMA Player с витриной и бесконечной рекламой</title>
 <style>
 body{
   margin:0;
@@ -62,7 +62,7 @@ video{
 }
 #adText{
   position:absolute;
-  top:-40px; /* над видео */
+  top:-40px;
   left:20px;
   font-size:16px;
   color:white;
@@ -98,6 +98,18 @@ video{
   height:100%;
   z-index:5;
 }
+#closePlayer{
+  position:absolute;
+  top:20px;
+  left:20px;
+  font-size:28px;
+  cursor:pointer;
+  z-index:10;
+  color:white;
+  background:rgba(0,0,0,0.6);
+  padding:4px 8px;
+  border-radius:6px;
+}
 </style>
 </head>
 <body>
@@ -128,6 +140,7 @@ video{
 <div id="playerModal">
   <div id="videoContainer">
     <div id="adText">Просмотр начнется после рекламы</div>
+    <div id="closePlayer" onclick="closePlayer()">×</div>
     <video id="adVideo" playsinline muted autoplay></video>
     <div id="clickLayer"></div>
     <div id="skipBtn">Пропустить</div>
@@ -148,10 +161,10 @@ let quartiles = {};
 let skipAvailable = false;
 
 function getDeviceId() {
-  let id = localStorage.getItem("device_id");
-  if (!id) {
+  let id = sessionStorage.getItem("device_id");
+  if(!id) {
     id = crypto.randomUUID();
-    localStorage.setItem("device_id", id);
+    sessionStorage.setItem("device_id", id);
   }
   return id;
 }
@@ -176,14 +189,6 @@ function fireTracking(event){
   });
 }
 
-function finishAdFlow(){
-  video.pause();
-  video.currentTime = 0;
-  skipAvailable=false;
-  skipBtn.style.display="none";
-  loadVast(); // подгрузка следующей рекламы
-}
-
 async function loadVast(){
   modal.style.display="flex";
   skipBtn.style.display="none";
@@ -195,7 +200,7 @@ async function loadVast(){
 
   const vastUrl = `https://ssp.wink.ru/v1/rt/avod/vast?ad_place_type=preroll&age_value=18&broadcast_type=ott&client_id=${deviceId}&client_version=&domain=${domain}&embedded=P5&is_child=false&is_paid=0&location=100001&san=web_vast_code&ad_position=1&content_id=23080&device_type=NCWEB&web_client_type=mobile&cb=${Date.now()}&rnd=${Math.floor(Math.random()*1e9)}`;
   
-  try {
+  try{
     const xml = await fetchVast(vastUrl);
     const mediaFile = xml.querySelector("MediaFile");
     if(!mediaFile){
@@ -203,7 +208,6 @@ async function loadVast(){
       modal.style.display="none";
       return;
     }
-
     video.src = mediaFile.textContent.trim();
     video.load();
 
@@ -220,21 +224,26 @@ async function loadVast(){
 
     try{ await video.play(); } catch(e){}
 
-  } catch(e){
+  }catch(e){
     console.log("Ошибка VAST:", e);
     modal.style.display="none";
   }
 }
 
-video.addEventListener("ended",()=>{
+function finishAdFlow(){
   fireTracking("complete");
-  finishAdFlow();
-});
+  video.pause();
+  video.currentTime=0;
+  skipAvailable=false;
+  skipBtn.style.display="none";
+  loadVast(); // бесконечная подгрузка следующей рекламы
+}
+
+video.addEventListener("ended",finishAdFlow);
 
 video.addEventListener("timeupdate",()=>{
   if(!video.duration) return;
   const p = video.currentTime / video.duration;
-
   if(video.currentTime>=5 && !skipAvailable){
     skipAvailable=true;
     skipBtn.style.display="block";
@@ -244,14 +253,20 @@ video.addEventListener("timeupdate",()=>{
   if(p>=0.75 && !quartiles.q3){ quartiles.q3=true; fireTracking("thirdQuartile"); }
 });
 
-skipBtn.onclick = ()=>{ fireTracking("skip"); finishAdFlow(); };
-muteBtn.onclick = ()=>{ video.muted = !video.muted; muteBtn.innerText = video.muted ? "🔇" : "🔊"; };
-clickLayer.onclick = ()=>{ if(clickThroughUrl){ fireTracking("click"); window.open(clickThroughUrl,"_blank"); } };
+skipBtn.onclick=()=>{ fireTracking("skip"); finishAdFlow(); };
+muteBtn.onclick=()=>{ video.muted=!video.muted; muteBtn.innerText = video.muted?"🔇":"🔊"; };
+clickLayer.onclick=()=>{ if(clickThroughUrl){ fireTracking("click"); window.open(clickThroughUrl,"_blank"); } };
 
 function playAd(){
   loadVast();
 }
 
+function closePlayer(){
+  modal.style.display="none";
+  video.pause();
+  video.currentTime=0;
+  skipBtn.style.display="none";
+}
 </script>
 
 </body>
