@@ -1,160 +1,198 @@
 <!DOCTYPE html>
 <html lang="ru">
+
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Кинотеатр</title>
+
 <script src="https://imasdk.googleapis.com/js/sdkloader/ima3.js"></script>
+
 <style>
-body { margin:0; background:#0f0f0f; color:white; font-family:Arial; }
+body {
+    margin:0;
+    background:#0f0f0f;
+    color:white;
+    font-family:Arial;
+}
 h1 { padding:20px; margin:0; }
-.vitrina { display:flex; gap:20px; overflow-x:auto; padding:20px; }
-.vitrina::-webkit-scrollbar { display:none; }
-.card { min-width:65vw; cursor:pointer; }
-.card img { width:65vw; height:90vw; object-fit:cover; border-radius:20px; }
-.title { margin-top:10px; font-size:18px; }
-#playerModal { position:fixed; top:0; left:0; width:100%; height:100%; background:black; display:none; align-items:center; justify-content:center; z-index:9999; flex-direction:column; }
-#adText { margin-bottom:10px; font-size:18px; }
+.vitrina {
+    display:flex;
+    gap:20px;
+    overflow-x:auto;
+    padding:20px;
+}
+.vitrina::-webkit-scrollbar{ display:none; }
+.card{ min-width:65vw; cursor:pointer; }
+.card img{ width:65vw; height:90vw; object-fit:cover; border-radius:20px; }
+.title{ margin-top:10px; font-size:18px; }
+
+#playerModal {
+    position:fixed; top:0; left:0;
+    width:100%; height:100%;
+    background:black; display:none;
+    align-items:center; justify-content:center;
+    z-index:9999; flex-direction:column;
+}
 #videoContainer { width:100%; max-width:900px; position:relative; }
-video { width:100%; height:auto; background:black; }
-.close { position:absolute; top:20px; right:25px; font-size:35px; cursor:pointer; z-index:10000; }
-#adTimer { position:absolute; bottom:20px; left:20px; background:rgba(0,0,0,0.6); padding:8px 12px; border-radius:8px; font-size:14px; z-index:9999; }
-#skipAd { position:absolute; bottom:20px; right:20px; background:#ff0000; border:none; padding:10px 16px; color:white; border-radius:8px; display:none; z-index:9999; }
-#soundBtn { position:absolute; top:20px; left:20px; background:#222; color:white; border:none; padding:8px 12px; border-radius:6px; z-index:9999; cursor:pointer; }
+video{ width:100%; height:auto; }
+.close{ position:absolute; top:20px; right:25px; font-size:35px; cursor:pointer; z-index:10000; }
+
+#adText {
+    margin-bottom:10px;
+    font-size:18px;
+}
+#adTimer {
+    position:absolute; bottom:20px; left:20px;
+    background:rgba(0,0,0,0.6);
+    padding:8px 12px; border-radius:8px; font-size:14px; z-index:9999;
+}
+#skipAd {
+    position:absolute; bottom:20px; right:20px;
+    background:#ff0000; border:none; padding:10px 16px;
+    color:white; border-radius:8px; display:none; z-index:9999;
+}
+#soundBtn {
+    position:absolute; top:20px; right:20px;
+    background:black; color:white; border:none;
+    padding:8px 12px; border-radius:6px; z-index:9999;
+}
 </style>
+
 </head>
+
 <body>
 
 <h1>Сериалы</h1>
+
 <div class="vitrina">
-  <div class="card" onclick="playAd(0)"><img src="posters/molodezhka.jpg"><div class="title">Молодежка</div></div>
-  <div class="card" onclick="playAd(1)"><img src="posters/kuhnya.jpg"><div class="title">Кухня</div></div>
-  <div class="card" onclick="playAd(2)"><img src="posters/grand.jpg"><div class="title">Гранд</div></div>
-  <div class="card" onclick="playAd(3)"><img src="posters/deti-peremen.jpg"><div class="title">Дети перемен</div></div>
-  <div class="card" onclick="playAd(4)"><img src="posters/slovo-pacana.jpg"><div class="title">Слово пацана</div></div>
-  <div class="card" onclick="playAd(5)"><img src="posters/obnalshik.jpg"><div class="title">Обнальщик</div></div>
+<div class="card" onclick="playAd()"><img src="posters/molodezhka.jpg"><div class="title">Молодежка</div></div>
+<div class="card" onclick="playAd()"><img src="posters/kuhnya.jpg"><div class="title">Кухня</div></div>
+<div class="card" onclick="playAd()"><img src="posters/grand.jpg"><div class="title">Гранд</div></div>
+<div class="card" onclick="playAd()"><img src="posters/deti-peremen.jpg"><div class="title">Дети перемен</div></div>
+<div class="card" onclick="playAd()"><img src="posters/slovo-pacana.jpg"><div class="title">Слово пацана</div></div>
+<div class="card" onclick="playAd()"><img src="posters/obnalshik.jpg"><div class="title">Обнальщик</div></div>
 </div>
 
 <div id="playerModal">
-  <div class="close" onclick="closePlayer()">×</div>
-  <div id="adText">Просмотр начнется после рекламы</div>
-  <div id="videoContainer">
-    <button id="soundBtn" onclick="toggleSound()">🔇 Включить звук</button>
-    <video id="video" playsinline autoplay muted></video>
-    <div id="adTimer"></div>
-    <button id="skipAd" onclick="skipAd()">Пропустить</button>
-  </div>
+    <div class="close" onclick="closePlayer()">×</div>
+    <div id="adText">Просмотр начнется после рекламы</div>
+    <div id="videoContainer">
+        <button id="soundBtn" onclick="toggleSound()">🔇 Включить звук</button>
+        <video id="video" playsinline autoplay muted></video>
+        <div id="adTimer"></div>
+        <button id="skipAd" onclick="skipAd()">Пропустить</button>
+    </div>
 </div>
 
 <script>
-let currentPoster = 0;
-let adCount = 0;
-const maxAds = 3;
 let adDisplayContainer, adsLoader, adsManager;
-const video = document.getElementById("video");
-const posters = document.querySelectorAll(".card");
+let video = document.getElementById("video");
+let timerInterval;
 
-function playAd(index){
-  currentPoster = index;
-  adCount = 0;
-  document.getElementById("playerModal").style.display="flex";
-  video.muted = true;
-  video.pause(); video.src=""; // сброс предыдущего видео
-  requestAd();
+// Вызов рекламы по клику на постер
+function playAd(){
+    document.getElementById("playerModal").style.display="flex";
+    video.muted = true; // autoplay разрешен
+    video.pause(); video.src="";
+    startAdRequest();
 }
 
-function requestAd(){
-  let uid = localStorage.getItem("uid") || "uid"+Math.floor(Math.random()*999999999);
-  localStorage.setItem("uid", uid);
-  let device = /Android|iPhone/i.test(navigator.userAgent) ? "mobile":"desktop";
-  let domain = window.location.hostname;
-  let vastUrl =
-    "https://ssp.wink.ru/v1/rt/avod/vast?ad_place_type=preroll"+
-    "&age_value=18"+
-    "&broadcast_type=ott"+
-    "&client_id="+uid+
-    "&client_version=&domain="+domain+
-    "&embedded=P5"+
-    "&is_child=false&is_paid=0"+
-    "&location=100001"+
-    "&san=web_vast_code"+
-    "&ad_position=1"+
-    "&content_id=23080"+
-    "&device_type=NCWEB"+
-    "&web_client_type="+device+
-    "&cb="+Date.now()+
-    "&rnd="+Math.floor(Math.random()*1000000000);
+function startAdRequest(){
+    const adContainer = document.getElementById("videoContainer");
 
-  adDisplayContainer = new google.ima.AdDisplayContainer(document.getElementById("videoContainer"), video);
-  adsLoader = new google.ima.AdsLoader(adDisplayContainer);
+    // уникальный идентификатор устройства для cachebuster
+    let uid = localStorage.getItem("uid") || "uid" + Math.floor(Math.random()*999999999);
+    localStorage.setItem("uid", uid);
 
-  adsLoader.addEventListener(google.ima.AdsManagerLoadedEvent.Type.ADS_MANAGER_LOADED, onAdsManagerLoaded, false);
-  adsLoader.addEventListener(google.ima.AdErrorEvent.Type.AD_ERROR, onAdError, false);
+    const device = /Android|iPhone/i.test(navigator.userAgent) ? "mobile" : "desktop";
+    const domain = window.location.hostname;
 
-  let adsRequest = new google.ima.AdsRequest();
-  adsRequest.adTagUrl = vastUrl;
-  adsRequest.linearAdSlotWidth = window.innerWidth;
-  adsRequest.linearAdSlotHeight = window.innerHeight;
+    const vastUrl =
+        "https://ssp.wink.ru/v1/rt/avod/vast?ad_place_type=preroll"+
+        "&age_value=18"+
+        "&broadcast_type=ott"+
+        "&client_id="+uid+
+        "&client_version=&domain="+domain+
+        "&embedded=P5"+
+        "&is_child=false&is_paid=0"+
+        "&location=100001"+
+        "&san=web_vast_code"+
+        "&ad_position=1"+
+        "&content_id=23080"+
+        "&device_type=NCWEB"+
+        "&web_client_type="+device+
+        "&cb="+Date.now()+
+        "&rnd="+Math.floor(Math.random()*1000000000);
 
-  adDisplayContainer.initialize();
-  adsLoader.requestAds(adsRequest);
+    // destroy старый AdsManager, если был
+    if(adsManager){ adsManager.destroy(); adsManager=null; }
+
+    adDisplayContainer = new google.ima.AdDisplayContainer(adContainer, video);
+    adsLoader = new google.ima.AdsLoader(adDisplayContainer);
+
+    adsLoader.addEventListener(
+        google.ima.AdsManagerLoadedEvent.Type.ADS_MANAGER_LOADED,
+        onAdsManagerLoaded, false
+    );
+    adsLoader.addEventListener(
+        google.ima.AdErrorEvent.Type.AD_ERROR,
+        onAdError, false
+    );
+
+    const adsRequest = new google.ima.AdsRequest();
+    adsRequest.adTagUrl = vastUrl;
+    adsRequest.linearAdSlotWidth = window.innerWidth;
+    adsRequest.linearAdSlotHeight = window.innerHeight;
+
+    adDisplayContainer.initialize();
+    adsLoader.requestAds(adsRequest);
 }
 
 function onAdsManagerLoaded(event){
-  adsManager = event.getAdsManager(video);
-  adsManager.addEventListener(google.ima.AdEvent.Type.COMPLETE, onAdComplete);
-  adsManager.addEventListener(google.ima.AdEvent.Type.STARTED, startAdTimer);
-  try { adsManager.init(window.innerWidth, window.innerHeight, google.ima.ViewMode.NORMAL); } catch(e){}
-  try { adsManager.start(); } catch(e){}
+    adsManager = event.getAdsManager(video);
+    adsManager.addEventListener(google.ima.AdEvent.Type.STARTED, startAdTimer);
+    adsManager.addEventListener(google.ima.AdEvent.Type.COMPLETE, onAdComplete);
+
+    try { adsManager.init(window.innerWidth, window.innerHeight, google.ima.ViewMode.NORMAL); } catch(e){}
+    try { adsManager.start(); } catch(e){}
 }
 
 function startAdTimer(){
-  const timer = document.getElementById("adTimer");
-  document.getElementById("skipAd").style.display="block";
-  clearInterval(timerInterval);
-  timerInterval = setInterval(()=>{
-    if(adsManager) {
-      let remaining = Math.round(adsManager.getRemainingTime());
-      timer.innerText = "Реклама: "+remaining+" сек";
-    }
-  },500);
+    document.getElementById("skipAd").style.display="block";
+    const timer = document.getElementById("adTimer");
+    clearInterval(timerInterval);
+    timerInterval = setInterval(()=>{
+        if(!adsManager) return;
+        const remaining = Math.round(adsManager.getRemainingTime());
+        timer.innerText = "Реклама: "+remaining+" сек";
+        if(remaining <=0) clearInterval(timerInterval);
+    }, 500);
 }
 
 function onAdComplete(){
-  clearInterval(timerInterval);
-  document.getElementById("skipAd").style.display="none";
-  adCount++;
-  if(adCount < maxAds){
-    requestAd();
-  } else {
-    nextPoster();
-  }
+    clearInterval(timerInterval);
+    document.getElementById("skipAd").style.display="none";
+    closePlayer();
 }
 
 function skipAd(){
-  if(adsManager){
-    try { adsManager.skip(); } catch(e){ onAdComplete(); }
-  }
+    if(adsManager){
+        try{ adsManager.skip(); } catch(e){ onAdComplete(); }
+    }
 }
 
 function toggleSound(){
-  video.muted = !video.muted;
-  document.getElementById("soundBtn").innerText = video.muted?"🔇 Включить звук":"🔊 Выключить звук";
+    video.muted = !video.muted;
+    document.getElementById("soundBtn").innerText = video.muted ? "🔇 Включить звук" : "🔊 Выключить звук";
 }
 
 function closePlayer(){
-  document.getElementById("playerModal").style.display="none";
-  clearInterval(timerInterval);
-  document.getElementById("skipAd").style.display="none";
-  document.getElementById("adTimer").innerText="";
-  if(adsManager){ adsManager.destroy(); adsManager=null; }
-}
-
-function nextPoster(){
-  closePlayer();
-  currentPoster++;
-  if(currentPoster>=posters.length) currentPoster=0;
-  playAd(currentPoster);
+    document.getElementById("playerModal").style.display="none";
+    clearInterval(timerInterval);
+    document.getElementById("skipAd").style.display="none";
+    document.getElementById("adTimer").innerText="";
+    if(adsManager){ adsManager.destroy(); adsManager=null; }
 }
 </script>
 
