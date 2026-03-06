@@ -203,19 +203,27 @@ let adCount = 0
 let maxAds = 3
 
 let timerInterval
-let isMuted = true
 
-function openPlayer(){
+function playAd(){
 
-document.getElementById("playerModal").style.display="flex"
+// очищаем предыдущую рекламу
+if(adsManager){
+adsManager.destroy()
+adsManager = null
+}
 
 adCount = 0
 
-startAd()
+document.getElementById("playerModal").style.display="flex"
+
+let adContainer = document.getElementById("adContainer")
+adContainer.innerHTML=""
+
+startAdRequest()
 
 }
 
-function startAd(){
+function startAdRequest(){
 
 let video = document.getElementById("video")
 let adContainer = document.getElementById("adContainer")
@@ -235,6 +243,7 @@ let vastUrl =
 +"&age_value=18"
 +"&broadcast_type=ott"
 +"&client_id="+uid
++"&client_version="
 +"&domain="+domain
 +"&embedded=P5"
 +"&is_child=false"
@@ -286,8 +295,6 @@ window.innerHeight,
 google.ima.ViewMode.NORMAL
 )
 
-adsManager.setVolume(isMuted ? 0 : 1)
-
 adsManager.start()
 
 adsManager.addEventListener(
@@ -308,6 +315,7 @@ clearInterval(timerInterval)
 
 document.getElementById("skipAd").style.display="none"
 
+// уничтожаем предыдущий AdsManager
 if(adsManager){
 adsManager.destroy()
 adsManager = null
@@ -317,11 +325,11 @@ adCount++
 
 if(adCount < maxAds){
 
-startAd()
+startAdRequest()
 
 }else{
 
-console.log("3 рекламы показаны")
+closePlayer()
 
 }
 
@@ -345,6 +353,12 @@ let remaining = Math.round(adsManager.getRemainingTime())
 
 timer.innerText = "Реклама: "+remaining+" сек"
 
+if(remaining <= 0){
+
+clearInterval(timerInterval)
+
+}
+
 },500)
 
 }
@@ -352,22 +366,13 @@ timer.innerText = "Реклама: "+remaining+" сек"
 function skipAd(){
 
 if(adsManager){
+
 adsManager.stop()
-}
 
 }
 
-function toggleSound(){
-
-isMuted = !isMuted
-
-let btn = document.getElementById("soundBtn")
-
-btn.innerText = isMuted ? "🔇" : "🔊"
-
-if(adsManager){
-adsManager.setVolume(isMuted ? 0 : 1)
-}
+// запускаем следующий ролик
+onAdComplete()
 
 }
 
@@ -375,31 +380,22 @@ function onAdError(error){
 
 console.log("Ad error", error)
 
-if(adsManager){
-adsManager.destroy()
-adsManager = null
-}
-
-adCount++
-
-if(adCount < maxAds){
-
-startAd()
-
-}
+closePlayer()
 
 }
 
 function closePlayer(){
 
+document.getElementById("playerModal").style.display="none"
+
 clearInterval(timerInterval)
+
+document.getElementById("skipAd").style.display="none"
 
 if(adsManager){
 adsManager.destroy()
 adsManager = null
 }
-
-document.getElementById("playerModal").style.display="none"
 
 }
 
