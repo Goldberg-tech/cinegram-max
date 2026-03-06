@@ -31,7 +31,9 @@ overflow-x:auto;
 padding:20px;
 }
 
-.vitrina::-webkit-scrollbar{display:none;}
+.vitrina::-webkit-scrollbar{
+display:none;
+}
 
 .card{
 min-width:65vw;
@@ -64,9 +66,11 @@ justify-content:center;
 z-index:9999;
 }
 
-#adTopText{
-margin-bottom:10px;
-font-size:16px;
+#adText{
+text-align:center;
+padding:15px;
+background:#111;
+width:100%;
 }
 
 #videoContainer{
@@ -77,12 +81,13 @@ position:relative;
 
 video{
 width:100%;
+height:auto;
 }
 
 .close{
 position:absolute;
-top:10px;
-right:20px;
+top:20px;
+right:25px;
 font-size:35px;
 cursor:pointer;
 z-index:10000;
@@ -95,6 +100,8 @@ left:20px;
 background:rgba(0,0,0,0.6);
 padding:8px 12px;
 border-radius:8px;
+font-size:14px;
+z-index:9999;
 }
 
 #skipAd{
@@ -107,17 +114,21 @@ padding:10px 16px;
 color:white;
 border-radius:8px;
 display:none;
+z-index:9999;
+cursor:pointer;
 }
 
-#muteBtn{
+#soundBtn{
 position:absolute;
-top:20px;
-left:20px;
-background:rgba(0,0,0,0.6);
+bottom:70px;
+right:20px;
+background:#222;
 border:none;
 color:white;
-padding:8px 10px;
+padding:10px 14px;
 border-radius:8px;
+cursor:pointer;
+z-index:9999;
 }
 
 </style>
@@ -162,29 +173,27 @@ border-radius:8px;
 
 </div>
 
-
 <div id="playerModal">
 
-<div id="adTopText">Просмотр начнется после рекламы</div>
+<div class="close" onclick="closePlayer()">×</div>
+
+<div id="adText">Просмотр начнется после рекламы</div>
 
 <div id="videoContainer">
-
-<div class="close" onclick="closePlayer()">×</div>
 
 <video id="video" playsinline autoplay muted></video>
 
 <div id="adContainer"></div>
 
-<button id="muteBtn" onclick="toggleSound()">🔇</button>
-
 <div id="adTimer"></div>
 
 <button id="skipAd" onclick="skipAd()">Пропустить</button>
 
-</div>
+<button id="soundBtn" onclick="toggleSound()">🔊</button>
 
 </div>
 
+</div>
 
 <script>
 
@@ -194,74 +203,73 @@ let adsManager
 
 let adCount = 0
 let maxAds = 3
+
 let timerInterval
-let currentPoster = 0
+
+let posters = document.querySelectorAll(".card")
+let currentPosterIndex = 0
+
+let soundEnabled = true
+
 
 function playAd(index){
 
-currentPoster = index
+currentPosterIndex = index
+
 adCount = 0
 
 document.getElementById("playerModal").style.display="flex"
 
+resetAds()
+
+startAdRequest()
+
+}
+
+
+function resetAds(){
+
+clearInterval(timerInterval)
+
+if(adsManager){
+adsManager.destroy()
+adsManager = null
+}
+
+if(adsLoader){
+adsLoader.destroy()
+adsLoader = null
+}
+
+document.getElementById("skipAd").style.display="none"
+document.getElementById("adTimer").innerText=""
+
+}
+
+
+function startAdRequest(){
+
 let video = document.getElementById("video")
 let adContainer = document.getElementById("adContainer")
 
-video.innerHTML=""
 adContainer.innerHTML=""
-
-if(!adsLoader){
-
-adDisplayContainer = new google.ima.AdDisplayContainer(adContainer, video)
-
-adsLoader = new google.ima.AdsLoader(adDisplayContainer)
-
-adsLoader.addEventListener(
-google.ima.AdsManagerLoadedEvent.Type.ADS_MANAGER_LOADED,
-onAdsManagerLoaded)
-
-adsLoader.addEventListener(
-google.ima.AdErrorEvent.Type.AD_ERROR,
-onAdError)
-
-}
-
-adDisplayContainer.initialize()
-
-requestAd()
-
-}
-
-function requestAd(){
-
-let adsRequest = new google.ima.AdsRequest()
-
-adsRequest.adTagUrl = vastURL()
-
-adsRequest.linearAdSlotWidth = window.innerWidth
-adsRequest.linearAdSlotHeight = window.innerHeight
-
-adsLoader.requestAds(adsRequest)
-
-}
-
-function vastURL(){
 
 let uid = localStorage.getItem("uid")
 
 if(!uid){
 uid = "uid"+Math.floor(Math.random()*999999999)
-localStorage.setItem("uid",uid)
+localStorage.setItem("uid", uid)
 }
 
-let domain = location.hostname
 let device = /Android|iPhone/i.test(navigator.userAgent) ? "mobile" : "desktop"
 
-return "https://ssp.wink.ru/v1/rt/avod/vast?ad_place_type=preroll"
+let domain = window.location.hostname
+
+let vastUrl =
+"https://ssp.wink.ru/v1/rt/avod/vast?ad_place_type=preroll"
 +"&age_value=18"
 +"&broadcast_type=ott"
 +"&client_id="+uid
-+"&client_version="
 +"&domain="+domain
 +"&embedded=P5"
 +"&is_child=false"
@@ -273,8 +281,34 @@ return "https://ssp.wink.ru/v1/rt/avod/vast?ad_place_type=preroll"
 +"&device_type=NCWEB"
 +"&web_client_type="+device
 +"&cb="+Date.now()
++"&rnd="+Math.floor(Math.random()*1000000000)
+
+adDisplayContainer = new google.ima.AdDisplayContainer(adContainer, video)
+
+adsLoader = new google.ima.AdsLoader(adDisplayContainer)
+
+adsLoader.addEventListener(
+google.ima.AdsManagerLoadedEvent.Type.ADS_MANAGER_LOADED,
+onAdsManagerLoaded,
+false)
+
+adsLoader.addEventListener(
+google.ima.AdErrorEvent.Type.AD_ERROR,
+onAdError,
+false)
+
+let adsRequest = new google.ima.AdsRequest()
+
+adsRequest.adTagUrl = vastUrl
+adsRequest.linearAdSlotWidth = window.innerWidth
+adsRequest.linearAdSlotHeight = window.innerHeight
+
+adsLoader.requestAds(adsRequest)
+
+adDisplayContainer.initialize()
 
 }
+
 
 function onAdsManagerLoaded(event){
 
@@ -282,46 +316,31 @@ let video = document.getElementById("video")
 
 adsManager = event.getAdsManager(video)
 
-adsManager.addEventListener(
-google.ima.AdEvent.Type.COMPLETE,
-onAdComplete)
-
-adsManager.addEventListener(
-google.ima.AdEvent.Type.STARTED,
-startTimer)
-
-adsManager.addEventListener(
-google.ima.AdErrorEvent.Type.AD_ERROR,
-onAdError)
-
 adsManager.init(
 window.innerWidth,
 window.innerHeight,
-google.ima.ViewMode.NORMAL)
+google.ima.ViewMode.NORMAL
+)
 
 adsManager.start()
 
-}
+adsManager.addEventListener(
+google.ima.AdEvent.Type.COMPLETE,
+onAdComplete
+)
 
-function startTimer(){
+adsManager.addEventListener(
+google.ima.AdEvent.Type.STARTED,
+startAdTimer
+)
 
-let timer = document.getElementById("adTimer")
-
-setTimeout(()=>{
-document.getElementById("skipAd").style.display="block"
-},5000)
-
-timerInterval = setInterval(()=>{
-
-if(!adsManager) return
-
-let remaining = Math.round(adsManager.getRemainingTime())
-
-timer.innerText = "Реклама "+remaining+" сек"
-
-},500)
+adsManager.addEventListener(
+google.ima.AdErrorEvent.Type.AD_ERROR,
+onAdError
+)
 
 }
+
 
 function onAdComplete(){
 
@@ -333,72 +352,106 @@ adCount++
 
 if(adCount < maxAds){
 
-requestAd()
-
-}else{
-
-closePlayer()
-autoNextPoster()
-
-}
-
-}
-
-function skipAd(){
-
 if(adsManager){
-adsManager.stop()
-}
-
-}
-
-function onAdError(){
-
-console.log("Ad error")
-
-onAdComplete()
-
-}
-
-function toggleSound(){
-
-let video = document.getElementById("video")
-
-video.muted = !video.muted
-
-document.getElementById("muteBtn").innerText =
-video.muted ? "🔇" : "🔊"
-
-}
-
-function autoNextPoster(){
-
-let posters = document.querySelectorAll(".card")
-
-currentPoster++
-
-if(currentPoster >= posters.length){
-currentPoster = 0
+adsManager.destroy()
+adsManager = null
 }
 
 setTimeout(()=>{
-posters[currentPoster].click()
-},1000)
+startAdRequest()
+},300)
+
+}else{
+
+goToNextPoster()
 
 }
 
-function closePlayer(){
+}
+
+
+function startAdTimer(){
+
+let timer = document.getElementById("adTimer")
+
+setTimeout(()=>{
+
+document.getElementById("skipAd").style.display="block"
+
+},5000)
+
+timerInterval = setInterval(()=>{
+
+if(!adsManager) return
+
+let remaining = Math.max(0, Math.round(adsManager.getRemainingTime()))
+
+timer.innerText = "Реклама: "+remaining+" сек"
+
+if(remaining <= 0){
 
 clearInterval(timerInterval)
 
-document.getElementById("playerModal").style.display="none"
+}
 
-document.getElementById("skipAd").style.display="none"
+},500)
+
+}
+
+
+function skipAd(){
 
 if(adsManager){
 adsManager.destroy()
 adsManager = null
 }
+
+onAdComplete()
+
+}
+
+
+function toggleSound(){
+
+let video = document.getElementById("video")
+
+soundEnabled = !soundEnabled
+
+video.muted = !soundEnabled
+
+document.getElementById("soundBtn").innerText =
+soundEnabled ? "🔊" : "🔇"
+
+}
+
+
+function onAdError(error){
+
+console.log("Ad error", error)
+
+goToNextPoster()
+
+}
+
+
+function closePlayer(){
+
+document.getElementById("playerModal").style.display="none"
+
+resetAds()
+
+}
+
+
+function goToNextPoster(){
+
+currentPosterIndex++
+
+if(currentPosterIndex >= posters.length){
+currentPosterIndex = 0
+}
+
+playAd(currentPosterIndex)
 
 }
 
