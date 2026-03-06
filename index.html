@@ -203,6 +203,11 @@ let adContainer = document.getElementById("adContainer")
 
 adContainer.innerHTML=""
 
+/* КРИТИЧЕСКАЯ ЧАСТЬ */
+
+video.muted = true
+video.play().catch(()=>{})
+
 startAdRequest()
 
 }
