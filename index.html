@@ -1,6 +1,5 @@
 <!DOCTYPE html>
 <html lang="ru">
-
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
@@ -24,7 +23,6 @@ video{width:100%;}
 #soundBtn{position:absolute;top:20px;right:20px;background:black;color:white;border:none;padding:8px 12px;border-radius:6px;z-index:9999;}
 </style>
 </head>
-
 <body>
 <h1>Сериалы</h1>
 
@@ -42,7 +40,7 @@ video{width:100%;}
 <div id="message">Просмотр начнется после рекламы</div>
 <div id="videoContainer">
 <button id="soundBtn" onclick="toggleSound()">🔊</button>
-<video id="video" playsinline autoplay muted></video>
+<video id="video" playsinline muted></video>
 <div id="adContainer"></div>
 <div id="timer"></div>
 <button id="skipAd" onclick="skipAd()">Пропустить</button>
@@ -51,37 +49,55 @@ video{width:100%;}
 
 <script>
 let adsLoader, adsManager, adDisplayContainer;
-let adIndex=0, prerollCount=3;
-let currentPoster=0;
+let adIndex = 0, prerollCount = 3;
+let currentPoster = 0;
 let timerInterval, midrollTimer;
-const posters=document.querySelectorAll(".card");
+const posters = document.querySelectorAll(".card");
 
+// запуск по клику
 function startCinema(index){
-  currentPoster=index;
-  document.getElementById("playerModal").style.display="flex";
-  document.getElementById("message").innerText="Просмотр начнется после рекламы";
+  currentPoster = index;
+  document.getElementById("playerModal").style.display = "flex";
+  document.getElementById("message").innerText = "Просмотр начнется после рекламы";
   resetAds();
-  requestAd();
+  prepareVideoAndAd();
 }
 
+// сброс AdsManager
 function resetAds(){
-  if(adsManager){adsManager.destroy(); adsManager=null;}
+  if(adsManager){ adsManager.destroy(); adsManager = null; }
   clearInterval(timerInterval);
   clearTimeout(midrollTimer);
-  adIndex=0;
+  adIndex = 0;
 }
 
+// подготовка видео и контейнера перед AdsLoader
+function prepareVideoAndAd(){
+  const video = document.getElementById("video");
+  video.pause();
+  video.removeAttribute("src");
+  video.load();
+
+  // init AdDisplayContainer строго после клика
+  adDisplayContainer = new google.ima.AdDisplayContainer(document.getElementById("adContainer"), video);
+  adDisplayContainer.initialize();
+
+  // start playback после user interaction
+  video.play().then(()=> requestAd());
+}
+
+// запрос preroll/midroll
 function requestAd(){
-  let video=document.getElementById("video");
-  let adContainer=document.getElementById("adContainer");
-  adContainer.innerHTML="";
+  const video = document.getElementById("video");
+  const adContainer = document.getElementById("adContainer");
+  adContainer.innerHTML = "";
 
-  let uid=localStorage.getItem("uid")||("uid"+Math.floor(Math.random()*999999999));
-  localStorage.setItem("uid",uid);
-  let device=/Android|iPhone/i.test(navigator.userAgent)?"mobile":"desktop";
-  let domain=window.location.hostname;
+  const uid = localStorage.getItem("uid") || ("uid"+Math.floor(Math.random()*999999999));
+  localStorage.setItem("uid", uid);
+  const device = /Android|iPhone/i.test(navigator.userAgent)?"mobile":"desktop";
+  const domain = window.location.hostname;
 
-  let vastUrl="https://ssp.wink.ru/v1/rt/avod/vast?ad_place_type=preroll"
+  const vastUrl = "https://ssp.wink.ru/v1/rt/avod/vast?ad_place_type=preroll"
     +"&age_value=18"
     +"&broadcast_type=ott"
     +"&client_id="+uid
@@ -91,80 +107,85 @@ function requestAd(){
     +"&cb="+Date.now()
     +"&rnd="+Math.floor(Math.random()*9999999);
 
-  adDisplayContainer=new google.ima.AdDisplayContainer(adContainer,video);
-  adsLoader=new google.ima.AdsLoader(adDisplayContainer);
-
+  adsLoader = new google.ima.AdsLoader(adDisplayContainer);
   adsLoader.addEventListener(google.ima.AdsManagerLoadedEvent.Type.ADS_MANAGER_LOADED,onAdsManagerLoaded);
   adsLoader.addEventListener(google.ima.AdErrorEvent.Type.AD_ERROR,onAdError);
 
-  let adsRequest=new google.ima.AdsRequest();
-  adsRequest.adTagUrl=vastUrl;
-  adsRequest.linearAdSlotWidth=window.innerWidth;
-  adsRequest.linearAdSlotHeight=window.innerHeight;
+  const adsRequest = new google.ima.AdsRequest();
+  adsRequest.adTagUrl = vastUrl;
+  adsRequest.linearAdSlotWidth = window.innerWidth;
+  adsRequest.linearAdSlotHeight = window.innerHeight;
 
   adsLoader.requestAds(adsRequest);
-  adDisplayContainer.initialize();
 }
 
+// создание AdsManager и слушатели
 function onAdsManagerLoaded(event){
-  let video=document.getElementById("video");
-  adsManager=event.getAdsManager(video);
-  adsManager.init(window.innerWidth,window.innerHeight,google.ima.ViewMode.NORMAL);
+  const video = document.getElementById("video");
+  adsManager = event.getAdsManager(video);
+  adsManager.init(window.innerWidth, window.innerHeight, google.ima.ViewMode.NORMAL);
   adsManager.start();
   adsManager.addEventListener(google.ima.AdEvent.Type.COMPLETE,nextAd);
   adsManager.addEventListener(google.ima.AdEvent.Type.STARTED,startTimer);
 }
 
+// таймер и skip
 function startTimer(){
-  let timer=document.getElementById("timer");
-  setTimeout(()=>{document.getElementById("skipAd").style.display="block";},5000);
-  timerInterval=setInterval(()=>{
-    if(!adsManager)return;
-    let remain=Math.round(adsManager.getRemainingTime());
-    timer.innerText="Реклама: "+remain+" сек";
-    if(remain<=0) clearInterval(timerInterval);
+  const timer = document.getElementById("timer");
+  setTimeout(()=>{ document.getElementById("skipAd").style.display = "block"; },5000);
+
+  timerInterval = setInterval(()=>{
+    if(!adsManager) return;
+    const remain = Math.round(adsManager.getRemainingTime());
+    timer.innerText = "Реклама: "+remain+" сек";
+    if(remain <=0) clearInterval(timerInterval);
   },500);
 }
 
+// следующий preroll
 function nextAd(){
   clearInterval(timerInterval);
   document.getElementById("skipAd").style.display="none";
   adIndex++;
-  if(adIndex<prerollCount){
-    requestAd();
-  }else{
+  if(adIndex < prerollCount){
+    prepareVideoAndAd(); // пересоздаём AdsManager
+  } else {
     startContent();
   }
 }
 
+// skip
 function skipAd(){ nextAd(); }
 
+// midroll через 10 секунд после контента
 function startContent(){
-  // midroll через 10 секунд
-  midrollTimer=setTimeout(()=>{ requestAd(); },10000);
+  midrollTimer = setTimeout(()=>{ prepareVideoAndAd(); },10000);
   autoNext();
 }
 
+// автопереход на следующий постер
 function autoNext(){
   setTimeout(()=>{
     currentPoster++;
-    if(currentPoster>=posters.length){currentPoster=0;}
+    if(currentPoster>=posters.length) currentPoster=0;
     startCinema(currentPoster);
   },20000);
 }
 
+// звук
 function toggleSound(){
-  let video=document.getElementById("video");
-  video.muted=!video.muted;
+  const video = document.getElementById("video");
+  video.muted = !video.muted;
 }
 
+// обработка ошибок
 function onAdError(){ nextAd(); }
 
+// закрытие модалки
 function closePlayer(){
   document.getElementById("playerModal").style.display="none";
   resetAds();
 }
 </script>
-
 </body>
 </html>
