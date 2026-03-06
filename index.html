@@ -1,178 +1,156 @@
 <!DOCTYPE html>
-<html>
+<html lang="ru">
 <head>
-
-<script src="https://imasdk.googleapis.com/js/sdkloader/ima3.js"></script>
-
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Кинотеатр с VAST</title>
 <style>
-
+body{
+  margin:0;
+  background:#0f0f0f;
+  color:white;
+  font-family:Arial;
+}
+h1{
+  padding:20px;
+  margin:0;
+}
+.vitrina{
+  display:flex;
+  gap:20px;
+  overflow-x:auto;
+  padding:20px;
+}
+.vitrina::-webkit-scrollbar{display:none;}
+.card{min-width:65vw;cursor:pointer;}
+.card img{width:65vw;height:90vw;object-fit:cover;border-radius:20px;}
+.title{margin-top:10px;font-size:18px;}
+#playerModal{
+  position:fixed;top:0;left:0;width:100%;height:100%;
+  background:black;display:none;align-items:center;justify-content:center;
+  z-index:9999;flex-direction:column;
+}
+#adText{
+  margin-bottom:10px;font-size:18px;
+}
 #videoContainer{
-position:relative;
-width:800px;
-margin:auto;
+  width:100%;
+  max-width:900px;
+  position:relative;
 }
-
-#videoPlayer{
-width:100%;
+video{
+  width:100%;
+  height:auto;
+  background:black;
 }
-
-#adContainer{
-position:absolute;
-top:0;
-left:0;
-width:100%;
-height:100%;
+.close{
+  position:absolute;top:20px;right:25px;font-size:35px;cursor:pointer;z-index:10000;
 }
-
-#playButton{
-margin-top:20px;
+#skipAd{
+  position:absolute;bottom:20px;right:20px;background:red;border:none;padding:10px 16px;color:white;border-radius:8px;display:none;z-index:9999;
 }
-
+#muteBtn{
+  position:absolute;bottom:20px;left:20px;background:rgba(0,0,0,0.6);color:white;padding:8px 14px;border-radius:6px;cursor:pointer;z-index:9999;
+}
 </style>
 </head>
-
 <body>
 
-<div id="videoContainer">
-
-<video id="videoPlayer" controls>
-
-<source src="content.mp4" type="video/mp4">
-
-</video>
-
-<div id="adContainer"></div>
-
+<h1>Сериалы</h1>
+<div class="vitrina">
+  <div class="card" onclick="startCinema(0)"><img src="posters/molodezhka.jpg"><div class="title">Молодежка</div></div>
+  <div class="card" onclick="startCinema(1)"><img src="posters/kuhnya.jpg"><div class="title">Кухня</div></div>
+  <div class="card" onclick="startCinema(2)"><img src="posters/grand.jpg"><div class="title">Гранд</div></div>
+  <div class="card" onclick="startCinema(3)"><img src="posters/deti-peremen.jpg"><div class="title">Дети перемен</div></div>
+  <div class="card" onclick="startCinema(4)"><img src="posters/slovo-pacana.jpg"><div class="title">Слово пацана</div></div>
+  <div class="card" onclick="startCinema(5)"><img src="posters/obnalshik.jpg"><div class="title">Обнальщик</div></div>
 </div>
 
-<button id="playButton">Play</button>
+<div id="playerModal">
+  <div class="close" onclick="closePlayer()">×</div>
+  <div id="adText">Просмотр начнется после рекламы</div>
+  <div id="videoContainer">
+    <video id="video" playsinline muted></video>
+    <button id="skipAd" onclick="skipAd()">Пропустить</button>
+    <button id="muteBtn" onclick="toggleSound()">🔇</button>
+  </div>
+</div>
 
 <script>
+const video = document.getElementById("video");
+const playerModal = document.getElementById("playerModal");
+const skipBtn = document.getElementById("skipAd");
+const muteBtn = document.getElementById("muteBtn");
+const adText = document.getElementById("adText");
 
-const video = document.getElementById("videoPlayer")
-const adContainer = document.getElementById("adContainer")
-const playButton = document.getElementById("playButton")
+let currentPoster = 0;
+let adQueue = [];
+let adIndex = 0;
 
-let adsLoader
-let adsManager
-let adDisplayContainer
-
-function initIMA(){
-
-adDisplayContainer = new google.ima.AdDisplayContainer(
-adContainer,
-video
-)
-
-adsLoader = new google.ima.AdsLoader(adDisplayContainer)
-
-adsLoader.addEventListener(
-google.ima.AdsManagerLoadedEvent.Type.ADS_MANAGER_LOADED,
-onAdsManagerLoaded,
-false
-)
-
-adsLoader.addEventListener(
-google.ima.AdErrorEvent.Type.AD_ERROR,
-onAdError,
-false
-)
-
+// ===== СТАРТ ПЛЕЕРА =====
+function startCinema(index){
+  currentPoster = index;
+  playerModal.style.display = "flex";
+  adText.style.display = "block";
+  loadNextAd();
 }
 
-function requestAds(){
+// ===== ЗАГРУЗКА АДОВ =====
+async function loadNextAd(){
+  try {
+    // Получаем готовый URL через серверный прокси
+    const res = await fetch(`/proxy?device_id=${localStorage.device_id || crypto.randomUUID()}&poster=${currentPoster}&cb=${Date.now()}`);
+    if(!res.ok) throw new Error("Ошибка прокси");
+    const data = await res.json();
 
-const vastUrl = "https://adserver.com/vast.xml"
-
-const proxyUrl =
-"http://localhost:3000/vast?url=" + encodeURIComponent(vastUrl)
-
-const adsRequest = new google.ima.AdsRequest()
-
-adsRequest.adTagUrl = proxyUrl
-
-adsRequest.linearAdSlotWidth = 800
-adsRequest.linearAdSlotHeight = 450
-
-adsRequest.nonLinearAdSlotWidth = 800
-adsRequest.nonLinearAdSlotHeight = 150
-
-adsLoader.requestAds(adsRequest)
-
+    // data должен содержать { mediaUrl: "...", clickUrl: "...", tracking: {...} }
+    if(!data.mediaUrl) throw new Error("Нет mediaUrl");
+    video.src = data.mediaUrl;
+    video.load();
+    adQueue = data.queue || [data.mediaUrl]; // поддержка нескольких прероллов
+    adIndex = 0;
+    video.muted = true;
+    adText.innerText = "Просмотр начнется после рекламы";
+    video.play();
+  } catch(e){
+    console.error(e);
+    adText.innerText = "Реклама недоступна, начинаем просмотр";
+  }
 }
 
-function onAdsManagerLoaded(event){
-
-const adsRenderingSettings =
-new google.ima.AdsRenderingSettings()
-
-adsRenderingSettings.restoreCustomPlaybackStateOnAdBreakComplete = true
-
-adsManager =
-event.getAdsManager(video, adsRenderingSettings)
-
-adsManager.addEventListener(
-google.ima.AdErrorEvent.Type.AD_ERROR,
-onAdError
-)
-
-adsManager.addEventListener(
-google.ima.AdEvent.Type.CONTENT_PAUSE_REQUESTED,
-() => {
-video.pause()
-}
-)
-
-adsManager.addEventListener(
-google.ima.AdEvent.Type.CONTENT_RESUME_REQUESTED,
-() => {
-video.play()
-}
-)
-
-startAds()
-
+// ===== СЛЕДУЮЩИЙ АД =====
+function finishAd(){
+  adIndex++;
+  if(adIndex < adQueue.length){
+    video.src = adQueue[adIndex];
+    video.load();
+    video.play();
+  } else {
+    startContent();
+  }
 }
 
-function startAds(){
-
-try{
-
-adsManager.init(800,450,google.ima.ViewMode.NORMAL)
-
-adsManager.start()
-
-}catch(e){
-
-video.play()
-
+// ===== КНОПКИ =====
+function skipAd(){
+  finishAd();
+}
+function toggleSound(){
+  video.muted = !video.muted;
+  muteBtn.innerText = video.muted ? "🔇" : "🔊";
+}
+function closePlayer(){
+  playerModal.style.display = "none";
+  video.pause();
+  video.src = "";
+}
+function startContent(){
+  adText.style.display = "none";
+  video.muted = false;
+  // сюда можно вставить запуск основного контента
 }
 
-}
-
-function onAdError(error){
-
-console.log("Ad error", error)
-
-if(adsManager){
-adsManager.destroy()
-}
-
-video.play()
-
-}
-
-playButton.addEventListener("click", () => {
-
-adDisplayContainer.initialize()
-
-initIMA()
-
-requestAds()
-
-})
-
+// ===== СОБЫТИЯ ВИДЕО =====
+video.addEventListener("ended", finishAd);
 </script>
-
 </body>
 </html>
