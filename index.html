@@ -1,237 +1,178 @@
 <!DOCTYPE html>
 <html>
 <head>
-<meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>TMA Wink Player</title>
+
+<script src="https://imasdk.googleapis.com/js/sdkloader/ima3.js"></script>
 
 <style>
-html,body{
-    margin:0;
-    padding:0;
-    background:black;
-    height:100%;
-    overflow:hidden;
-    font-family:Arial;
+
+#videoContainer{
+position:relative;
+width:800px;
+margin:auto;
 }
 
-video{
-    width:100%;
-    height:100%;
-    object-fit:contain;
-    background:black;
+#videoPlayer{
+width:100%;
 }
 
-#loader{
-    position:absolute;
-    top:50%;
-    left:50%;
-    transform:translate(-50%,-50%);
-    color:white;
+#adContainer{
+position:absolute;
+top:0;
+left:0;
+width:100%;
+height:100%;
 }
 
-#skipBtn{
-    position:absolute;
-    top:20px;
-    right:20px;
-    background:rgba(0,0,0,.6);
-    color:white;
-    padding:8px 14px;
-    border-radius:6px;
-    display:none;
-    cursor:pointer;
-    z-index:10;
+#playButton{
+margin-top:20px;
 }
 
-#muteBtn{
-    position:absolute;
-    bottom:20px;
-    right:20px;
-    background:rgba(0,0,0,.6);
-    color:white;
-    padding:8px 14px;
-    border-radius:6px;
-    cursor:pointer;
-    z-index:10;
-}
-
-#clickLayer{
-    position:absolute;
-    top:0;
-    left:0;
-    width:100%;
-    height:100%;
-}
 </style>
 </head>
 
 <body>
 
-<div id="loader">Загрузка рекламы...</div>
-<div id="skipBtn">Пропустить</div>
-<div id="muteBtn">🔇</div>
-<div id="clickLayer"></div>
+<div id="videoContainer">
 
-<video id="adVideo" playsinline muted autoplay></video>
+<video id="videoPlayer" controls>
+
+<source src="content.mp4" type="video/mp4">
+
+</video>
+
+<div id="adContainer"></div>
+
+</div>
+
+<button id="playButton">Play</button>
 
 <script>
-// Telegram WebApp init
-const tg = window.Telegram?.WebApp;
-if(tg) tg.expand();
 
-const video = document.getElementById("adVideo");
-const loader = document.getElementById("loader");
-const skipBtn = document.getElementById("skipBtn");
-const muteBtn = document.getElementById("muteBtn");
-const clickLayer = document.getElementById("clickLayer");
+const video = document.getElementById("videoPlayer")
+const adContainer = document.getElementById("adContainer")
+const playButton = document.getElementById("playButton")
 
-// ===== DEVICE / DOMAIN =====
-let deviceId = localStorage.device_id;
-if(!deviceId){
-    deviceId = crypto.randomUUID();
-    localStorage.setItem("device_id", deviceId);
+let adsLoader
+let adsManager
+let adDisplayContainer
+
+function initIMA(){
+
+adDisplayContainer = new google.ima.AdDisplayContainer(
+adContainer,
+video
+)
+
+adsLoader = new google.ima.AdsLoader(adDisplayContainer)
+
+adsLoader.addEventListener(
+google.ima.AdsManagerLoadedEvent.Type.ADS_MANAGER_LOADED,
+onAdsManagerLoaded,
+false
+)
+
+adsLoader.addEventListener(
+google.ima.AdErrorEvent.Type.AD_ERROR,
+onAdError,
+false
+)
+
 }
 
-const domain = "kinopoisk.ru"; // <- подставляем рабочий OTT-домен
+function requestAds(){
 
-// ===== VAST URL =====
-function getVastUrl(){
-    const cb = Date.now() + Math.floor(Math.random()*1000000); // cachebuster
-    return `https://ssp.wink.ru/v1/rt/avod/vast?ad_place_type=preroll&age_value=18&broadcast_type=ott&client_id=${deviceId}&client_version=&domain=${domain}&embedded=P5&is_child=false&is_paid=0&location=100001&san=web_vast_code&ad_position=1&content_id=23080&device_type=NCWEB&web_client_type=mobile&cb=${cb}`.replace(/\s+/g,'');
+const vastUrl = "https://adserver.com/vast.xml"
+
+const proxyUrl =
+"http://localhost:3000/vast?url=" + encodeURIComponent(vastUrl)
+
+const adsRequest = new google.ima.AdsRequest()
+
+adsRequest.adTagUrl = proxyUrl
+
+adsRequest.linearAdSlotWidth = 800
+adsRequest.linearAdSlotHeight = 450
+
+adsRequest.nonLinearAdSlotWidth = 800
+adsRequest.nonLinearAdSlotHeight = 150
+
+adsLoader.requestAds(adsRequest)
+
 }
 
-// ===== STATE =====
-let tracking = {};
-let clickThroughUrl = null;
-let quartiles = {};
-let skipAvailable = false;
+function onAdsManagerLoaded(event){
 
-// ===== FETCH VAST (Wrapper support) =====
-async function fetchVast(url, depth=0){
-    if(depth>5) throw "Wrapper depth limit";
-    const res = await fetch(url, {mode:'cors'});
-    const text = await res.text();
-    const xml = new DOMParser().parseFromString(text,"text/xml");
+const adsRenderingSettings =
+new google.ima.AdsRenderingSettings()
 
-    const wrapper = xml.querySelector("Wrapper VASTAdTagURI");
-    if(wrapper){
-        return fetchVast(wrapper.textContent.trim(), depth+1);
-    }
-    return xml;
+adsRenderingSettings.restoreCustomPlaybackStateOnAdBreakComplete = true
+
+adsManager =
+event.getAdsManager(video, adsRenderingSettings)
+
+adsManager.addEventListener(
+google.ima.AdErrorEvent.Type.AD_ERROR,
+onAdError
+)
+
+adsManager.addEventListener(
+google.ima.AdEvent.Type.CONTENT_PAUSE_REQUESTED,
+() => {
+video.pause()
+}
+)
+
+adsManager.addEventListener(
+google.ima.AdEvent.Type.CONTENT_RESUME_REQUESTED,
+() => {
+video.play()
+}
+)
+
+startAds()
+
 }
 
-// ===== FIRE TRACKING =====
-function fireTracking(event){
-    if(!tracking[event]) return;
-    tracking[event].forEach(url=>{
-        fetch(url).catch(()=>{});
-    });
+function startAds(){
+
+try{
+
+adsManager.init(800,450,google.ima.ViewMode.NORMAL)
+
+adsManager.start()
+
+}catch(e){
+
+video.play()
+
 }
 
-// ===== FINISH CURRENT AD & LOAD NEXT =====
-function finishAdFlow(){
-    video.pause();
-    video.currentTime = 0;
-    skipAvailable=false;
-    skipBtn.style.display="none";
-    loader.style.display="block";
-    loader.innerText="Загрузка рекламы...";
-
-    setTimeout(loadVast, 300);
 }
 
-// ===== LOAD VAST =====
-async function loadVast(){
-    try{
-        const xml = await fetchVast(getVastUrl());
-        const mediaFile = xml.querySelector("MediaFile");
+function onAdError(error){
 
-        if(!mediaFile){
-            loader.innerText="Реклама завершена";
-            return;
-        }
+console.log("Ad error", error)
 
-        video.src = mediaFile.textContent.trim();
-        video.load();
-
-        tracking = {};
-        clickThroughUrl = null;
-        quartiles = {};
-
-        xml.querySelectorAll("Tracking").forEach(node=>{
-            const ev = node.getAttribute("event");
-            if(!tracking[ev]) tracking[ev]=[];
-            tracking[ev].push(node.textContent.trim());
-        });
-
-        const imp = xml.querySelector("Impression");
-        if(imp) tracking.impression=[imp.textContent.trim()];
-
-        const clickNode = xml.querySelector("ClickThrough");
-        if(clickNode) clickThroughUrl = clickNode.textContent.trim();
-
-        loader.style.display="none";
-        video.muted = true;
-
-        try{
-            await video.play();
-        }catch(e){}
-    }catch(e){
-        loader.innerText="Реклама завершена";
-    }
+if(adsManager){
+adsManager.destroy()
 }
 
-// ===== VIDEO EVENTS =====
-video.addEventListener("ended", ()=>{
-    fireTracking("complete");
-    finishAdFlow();
-});
+video.play()
 
-video.addEventListener("timeupdate", ()=>{
-    if(!video.duration) return;
-    const p = video.currentTime / video.duration;
+}
 
-    if(video.currentTime>=5 && !skipAvailable){
-        skipAvailable=true;
-        skipBtn.style.display="block";
-    }
+playButton.addEventListener("click", () => {
 
-    if(p>=0.25 && !quartiles.q1){
-        quartiles.q1=true;
-        fireTracking("firstQuartile");
-    }
-    if(p>=0.5 && !quartiles.q2){
-        quartiles.q2=true;
-        fireTracking("midpoint");
-    }
-    if(p>=0.75 && !quartiles.q3){
-        quartiles.q3=true;
-        fireTracking("thirdQuartile");
-    }
-});
+adDisplayContainer.initialize()
 
-// ===== CONTROLS =====
-skipBtn.onclick = ()=>{
-    fireTracking("skip");
-    finishAdFlow();
-};
+initIMA()
 
-muteBtn.onclick = ()=>{
-    video.muted = !video.muted;
-    muteBtn.innerText = video.muted ? "🔇" : "🔊";
-};
+requestAds()
 
-// ===== CLICK THROUGH =====
-clickLayer.onclick = ()=>{
-    if(!clickThroughUrl) return;
-    fireTracking("click");
-    if(tg) tg.openLink(clickThroughUrl);
-    else window.open(clickThroughUrl,"_blank");
-};
-
-// ===== START =====
-loadVast();
+})
 
 </script>
+
 </body>
 </html>
