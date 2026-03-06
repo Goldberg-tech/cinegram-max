@@ -207,41 +207,40 @@ let isMuted = true
 
 function openPlayer(){
 
-resetAds()
-
 document.getElementById("playerModal").style.display="flex"
 
-startAd()
-
-}
-
-function resetAds(){
-
-clearInterval(timerInterval)
-
-if(adsManager){
-adsManager.destroy()
-adsManager = null
-}
-
-if(adsLoader){
-adsLoader.destroy()
-adsLoader = null
-}
-
-document.getElementById("skipAd").style.display="none"
-document.getElementById("adTimer").innerText=""
+initIMA()
 
 adCount = 0
 
+requestAd()
+
 }
 
-function startAd(){
+function initIMA(){
 
 let video = document.getElementById("video")
 let adContainer = document.getElementById("adContainer")
 
-adContainer.innerHTML=""
+adDisplayContainer = new google.ima.AdDisplayContainer(adContainer, video)
+
+adsLoader = new google.ima.AdsLoader(adDisplayContainer)
+
+adsLoader.addEventListener(
+google.ima.AdsManagerLoadedEvent.Type.ADS_MANAGER_LOADED,
+onAdsManagerLoaded,
+false)
+
+adsLoader.addEventListener(
+google.ima.AdErrorEvent.Type.AD_ERROR,
+onAdError,
+false)
+
+adDisplayContainer.initialize()
+
+}
+
+function requestAd(){
 
 let uid = localStorage.getItem("uid")
 
@@ -251,7 +250,6 @@ localStorage.setItem("uid", uid)
 }
 
 let device = /Android|iPhone/i.test(navigator.userAgent) ? "mobile" : "desktop"
-
 let domain = window.location.hostname
 
 let vastUrl =
@@ -272,20 +270,6 @@ let vastUrl =
 +"&cb="+Date.now()
 +"&rnd="+Math.floor(Math.random()*1000000000)
 
-adDisplayContainer = new google.ima.AdDisplayContainer(adContainer, video)
-
-adsLoader = new google.ima.AdsLoader(adDisplayContainer)
-
-adsLoader.addEventListener(
-google.ima.AdsManagerLoadedEvent.Type.ADS_MANAGER_LOADED,
-onAdsManagerLoaded,
-false)
-
-adsLoader.addEventListener(
-google.ima.AdErrorEvent.Type.AD_ERROR,
-onAdError,
-false)
-
 let adsRequest = new google.ima.AdsRequest()
 
 adsRequest.adTagUrl = vastUrl
@@ -293,8 +277,6 @@ adsRequest.linearAdSlotWidth = window.innerWidth
 adsRequest.linearAdSlotHeight = window.innerHeight
 
 adsLoader.requestAds(adsRequest)
-
-adDisplayContainer.initialize()
 
 }
 
@@ -332,15 +314,20 @@ clearInterval(timerInterval)
 
 document.getElementById("skipAd").style.display="none"
 
+if(adsManager){
+adsManager.destroy()
+adsManager = null
+}
+
 adCount++
 
 if(adCount < maxAds){
 
-startAd()
+requestAd()
 
 }else{
 
-closePlayer()
+console.log("рекламный блок завершен")
 
 }
 
@@ -364,24 +351,17 @@ let remaining = Math.round(adsManager.getRemainingTime())
 
 timer.innerText = "Реклама: "+remaining+" сек"
 
-if(remaining <= 0){
-clearInterval(timerInterval)
-}
-
 },500)
 
 }
 
 function skipAd(){
 
-clearInterval(timerInterval)
-
 if(adsManager){
-adsManager.destroy()
-adsManager = null
-}
 
-onAdComplete()
+adsManager.stop()
+
+}
 
 }
 
@@ -399,15 +379,37 @@ adsManager.setVolume(isMuted ? 0 : 1)
 
 }
 
-function onAdError(){
+function onAdError(error){
 
-onAdComplete()
+console.log("Ad error", error)
+
+if(adsManager){
+adsManager.destroy()
+adsManager = null
+}
+
+adCount++
+
+if(adCount < maxAds){
+
+requestAd()
+
+}else{
+
+console.log("рекламный блок завершен")
+
+}
 
 }
 
 function closePlayer(){
 
-resetAds()
+clearInterval(timerInterval)
+
+if(adsManager){
+adsManager.destroy()
+adsManager = null
+}
 
 document.getElementById("playerModal").style.display="none"
 
