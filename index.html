@@ -4,6 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Кинотеатр</title>
+<script src="https://imasdk.googleapis.com/js/sdkloader/ima3.js"></script>
 <style>
 body { margin:0; background:#0f0f0f; color:white; font-family:Arial; }
 h1 { padding:20px; margin:0; }
@@ -39,37 +40,34 @@ video { width:100%; height:auto; background:black; }
   <div id="adText">Просмотр начнется после рекламы</div>
   <div id="videoContainer">
     <button id="soundBtn" onclick="toggleSound()">🔇 Включить звук</button>
-    <video id="video" playsinline muted></video>
+    <video id="video" playsinline autoplay muted></video>
     <div id="adTimer"></div>
     <button id="skipAd" onclick="skipAd()">Пропустить</button>
   </div>
 </div>
 
 <script>
-const posters = document.querySelectorAll(".card")
-let currentPoster = 0
-let adCount = 0
-const maxAds = 3
-let video = document.getElementById("video")
-let timerInterval
+let currentPoster = 0;
+let adCount = 0;
+const maxAds = 3;
+let adDisplayContainer, adsLoader, adsManager;
+const video = document.getElementById("video");
+const posters = document.querySelectorAll(".card");
 
-function playAd(posterIndex){
-  currentPoster = posterIndex
-  adCount = 0
-  document.getElementById("playerModal").style.display = "flex"
-  video.muted = true
-  video.play().catch(()=>{})
-  startAd()
+function playAd(index){
+  currentPoster = index;
+  adCount = 0;
+  document.getElementById("playerModal").style.display="flex";
+  video.muted = true;
+  video.pause(); video.src=""; // сброс предыдущего видео
+  requestAd();
 }
 
-async function startAd(){
-  let uid = localStorage.getItem("uid")
-  if(!uid){
-    uid = "uid"+Math.floor(Math.random()*999999999)
-    localStorage.setItem("uid", uid)
-  }
-  let device = /Android|iPhone/i.test(navigator.userAgent) ? "mobile" : "desktop"
-  let domain = window.location.hostname
+function requestAd(){
+  let uid = localStorage.getItem("uid") || "uid"+Math.floor(Math.random()*999999999);
+  localStorage.setItem("uid", uid);
+  let device = /Android|iPhone/i.test(navigator.userAgent) ? "mobile":"desktop";
+  let domain = window.location.hostname;
   let vastUrl =
     "https://ssp.wink.ru/v1/rt/avod/vast?ad_place_type=preroll"+
     "&age_value=18"+
@@ -85,74 +83,78 @@ async function startAd(){
     "&device_type=NCWEB"+
     "&web_client_type="+device+
     "&cb="+Date.now()+
-    "&rnd="+Math.floor(Math.random()*1000000000)
-  try{
-    let resp = await fetch(vastUrl)
-    let text = await resp.text()
-    let parser = new DOMParser()
-    let xml = parser.parseFromString(text,"text/xml")
-    let mediaFile = xml.querySelector("MediaFile")
-    if(!mediaFile){
-      console.log("Нет MediaFile в VAST")
-      return
-    }
-    video.src = mediaFile.textContent.trim()
-    video.play().catch(()=>{})
-    startTimer()
-  }catch(e){
-    console.log("Ошибка VAST:", e)
-    closePlayer()
-  }
+    "&rnd="+Math.floor(Math.random()*1000000000);
+
+  adDisplayContainer = new google.ima.AdDisplayContainer(document.getElementById("videoContainer"), video);
+  adsLoader = new google.ima.AdsLoader(adDisplayContainer);
+
+  adsLoader.addEventListener(google.ima.AdsManagerLoadedEvent.Type.ADS_MANAGER_LOADED, onAdsManagerLoaded, false);
+  adsLoader.addEventListener(google.ima.AdErrorEvent.Type.AD_ERROR, onAdError, false);
+
+  let adsRequest = new google.ima.AdsRequest();
+  adsRequest.adTagUrl = vastUrl;
+  adsRequest.linearAdSlotWidth = window.innerWidth;
+  adsRequest.linearAdSlotHeight = window.innerHeight;
+
+  adDisplayContainer.initialize();
+  adsLoader.requestAds(adsRequest);
 }
 
-function startTimer(){
-  const timer = document.getElementById("adTimer")
-  document.getElementById("skipAd").style.display = "block"
-  clearInterval(timerInterval)
+function onAdsManagerLoaded(event){
+  adsManager = event.getAdsManager(video);
+  adsManager.addEventListener(google.ima.AdEvent.Type.COMPLETE, onAdComplete);
+  adsManager.addEventListener(google.ima.AdEvent.Type.STARTED, startAdTimer);
+  try { adsManager.init(window.innerWidth, window.innerHeight, google.ima.ViewMode.NORMAL); } catch(e){}
+  try { adsManager.start(); } catch(e){}
+}
+
+function startAdTimer(){
+  const timer = document.getElementById("adTimer");
+  document.getElementById("skipAd").style.display="block";
+  clearInterval(timerInterval);
   timerInterval = setInterval(()=>{
-    if(video.duration){
-      timer.innerText = "Реклама: "+Math.round(video.duration - video.currentTime)+" сек"
+    if(adsManager) {
+      let remaining = Math.round(adsManager.getRemainingTime());
+      timer.innerText = "Реклама: "+remaining+" сек";
     }
-  },500)
-  video.onended = ()=>{
-    clearInterval(timerInterval)
-    adCount++
-    if(adCount < maxAds){
-      startAd()
-    }else{
-      nextPoster()
-    }
+  },500);
+}
+
+function onAdComplete(){
+  clearInterval(timerInterval);
+  document.getElementById("skipAd").style.display="none";
+  adCount++;
+  if(adCount < maxAds){
+    requestAd();
+  } else {
+    nextPoster();
   }
 }
 
 function skipAd(){
-  video.pause()
-  adCount++
-  if(adCount < maxAds){
-    startAd()
-  }else{
-    nextPoster()
+  if(adsManager){
+    try { adsManager.skip(); } catch(e){ onAdComplete(); }
   }
 }
 
 function toggleSound(){
-  video.muted = !video.muted
-  document.getElementById("soundBtn").innerText = video.muted ? "🔇 Включить звук" : "🔊 Выключить звук"
+  video.muted = !video.muted;
+  document.getElementById("soundBtn").innerText = video.muted?"🔇 Включить звук":"🔊 Выключить звук";
 }
 
 function closePlayer(){
-  document.getElementById("playerModal").style.display = "none"
-  video.pause()
-  video.src = ""
-  document.getElementById("skipAd").style.display = "none"
-  document.getElementById("adTimer").innerText = ""
+  document.getElementById("playerModal").style.display="none";
+  clearInterval(timerInterval);
+  document.getElementById("skipAd").style.display="none";
+  document.getElementById("adTimer").innerText="";
+  if(adsManager){ adsManager.destroy(); adsManager=null; }
 }
 
 function nextPoster(){
-  closePlayer()
-  currentPoster++
-  if(currentPoster >= posters.length) currentPoster=0
-  playAd(currentPoster)
+  closePlayer();
+  currentPoster++;
+  if(currentPoster>=posters.length) currentPoster=0;
+  playAd(currentPoster);
 }
 </script>
 
