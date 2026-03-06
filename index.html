@@ -1,99 +1,49 @@
 <!DOCTYPE html>
 <html lang="ru">
 <head>
-  <meta charset="UTF-8">
-  <title>TMA Wink VAST Test</title>
-  <link href="https://vjs.zencdn.net/7.23.0/video-js.css" rel="stylesheet" />
-  <style>
-    body, html {
-      margin: 0; padding: 0;
-      width: 100%; height: 100%;
-      display: flex; justify-content: center; align-items: center;
-      background: #000;
-    }
-    #player-container {
-      width: 360px;
-      height: 640px;
-      position: relative;
-    }
-    #playAdBtn {
-      position: absolute;
-      bottom: 20px;
-      left: 50%;
-      transform: translateX(-50%);
-      padding: 12px 20px;
-      font-size: 16px;
-      background: #0088cc;
-      color: white;
-      border: none;
-      border-radius: 8px;
-      cursor: pointer;
-      z-index: 10;
-    }
-  </style>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Wink VAST MiniApp</title>
+<style>
+body {margin:0; background:#000; display:flex; justify-content:center; align-items:center; height:100vh;}
+#wink-player {width:100%; max-width:420px; height:236px;}
+button {position:absolute; bottom:20px; left:50%; transform:translateX(-50%); padding:12px 20px; font-size:16px; background:#0088cc; color:white; border:none; border-radius:8px; cursor:pointer;}
+</style>
 </head>
 <body>
 
-<div id="player-container">
-  <video
-    id="vast-player"
-    class="video-js vjs-default-skin"
-    controls
-    preload="auto"
-    width="360"
-    height="640"
-  ></video>
-  <button id="playAdBtn">Смотреть рекламу</button>
-</div>
+<div id="wink-player"></div>
+<button id="playAdBtn">Смотреть рекламу</button>
 
-<script src="https://vjs.zencdn.net/7.23.0/video.min.js"></script>
-<script src="https://cdn.jsdelivr.net/npm/videojs-contrib-ads@6.9.0/dist/videojs-contrib-ads.min.js"></script>
-<script src="https://cdn.jsdelivr.net/npm/videojs-ima@1.9.0/dist/videojs.ima.min.js"></script>
-<script src="https://telegram.org/js/telegram-web-app.js"></script>
-
+<script src="https://static-adtech.wink.ru/embed-sdk/winkembed.umd.js"></script>
 <script>
-const player = videojs('vast-player', {
-  controls: true,
-  fluid: true
-});
-
-// Кнопка запуска рекламы
-const playBtn = document.getElementById('playAdBtn');
+const container = document.getElementById("wink-player");
+const playBtn = document.getElementById("playAdBtn");
 
 function getUID() {
   return window.Telegram?.WebApp?.initDataUnsafe?.user?.id || 'web_'+Math.random().toString(36).substring(2);
 }
 function getDomain() { return location.hostname; }
 
-function buildVAST() {
+function buildFrameOptions() {
   const uid = getUID();
   const domain = getDomain();
-  const isMobile = /Android|iPhone/i.test(navigator.userAgent);
-  return isMobile
-    ? "https://ssp.wink.ru/v1/rt/avod/vast?ad_place_type=preroll&age_value=18&broadcast_type=ott&client_id="+uid+"&client_version=&domain="+domain+"&embedded=P5&is_child=false&is_paid=0&location=100001&san=web_vast_code&ad_position=1&content_id=23080&device_type=NCWEB&web_client_type=mobile"
-    : "https://ssp.wink.ru/v1/rt/avod/vast?ad_place_type=preroll&age_value=18&broadcast_type=ott&client_id="+uid+"&client_version=&domain="+domain+"&embedded=P5&is_child=false&is_paid=0&location=100001&san=web_vast_code&ad_position=1&content_id=23080&device_type=NCWEB&web_client_type=desktop";
+  return {
+    trackId: 23080,      // ID контента / плейсхолдер для рекламы
+    partnerId: 'P0',
+    frameOptions: { width: "100%", height: "236px", allowFullscreen: true },
+    params: {
+      client_id: uid,
+      domain: domain,
+      web_client_type: "mobile"
+    }
+  };
 }
 
-// Инициализация IMA и старт рекламы после нажатия
 playBtn.onclick = () => {
-  playBtn.style.display = 'none';
-
-  player.ima({
-    adTagUrl: buildVAST(),
-    debug: true
-  });
-
-  // Обязательно инициализируем adDisplayContainer после взаимодействия
-  player.ima.initializeAdDisplayContainer();
-
-  // Запуск preroll
-  player.ima.requestAds();
+  playBtn.style.display = "none";
+  WinkEmbedSDK.api.insertFrame(container, buildFrameOptions());
 };
-  
-// Опциональные события для логирования
-player.on('adstart', () => console.log('Реклама началась'));
-player.on('adend', () => console.log('Реклама закончилась'));
-player.on('adskip', () => console.log('Реклама пропущена'));
 </script>
 
 </body>
