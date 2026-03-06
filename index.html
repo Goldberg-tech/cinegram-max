@@ -3,114 +3,109 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>TMA Wink Player с витриной</title>
-
+<title>Кинотеатр с бесконечной рекламой</title>
 <style>
-html, body {
-  margin:0;
-  padding:0;
-  background:black;
-  height:100%;
-  overflow:hidden;
-  font-family:Arial;
+body{
+    margin:0;
+    background:#0f0f0f;
+    font-family:Arial;
+    color:white;
 }
-
+h1{padding:20px;margin:0;}
 .vitrina{
-  display:flex;
-  gap:20px;
-  overflow-x:auto;
-  padding:20px;
+    display:flex;
+    gap:20px;
+    overflow-x:auto;
+    padding:20px;
 }
-
 .vitrina::-webkit-scrollbar{display:none;}
-
 .card{
-  min-width:65vw;
-  cursor:pointer;
+    min-width:65vw;
+    cursor:pointer;
 }
-
 .card img{
-  width:65vw;
-  height:90vw;
-  object-fit:cover;
-  border-radius:20px;
+    width:65vw;
+    height:90vw;
+    object-fit:cover;
+    border-radius:20px;
 }
-
-.title{
-  margin-top:10px;
-  font-size:18px;
-}
-
+.title{margin-top:10px;font-size:18px;}
 #playerModal{
-  position:fixed;
-  top:0;
-  left:0;
-  width:100%;
-  height:100%;
-  background:black;
-  display:none;
-  align-items:center;
-  justify-content:center;
-  z-index:9999;
+    position:fixed;
+    top:0;
+    left:0;
+    width:100%;
+    height:100%;
+    background:black;
+    display:none;
+    flex-direction:column;
+    align-items:center;
+    justify-content:center;
+    z-index:9999;
 }
-
+#adNotice{
+    font-size:18px;
+    margin-bottom:10px;
+}
+#videoContainer{
+    width:100%;
+    max-width:900px;
+    position:relative;
+}
 video{
-  width:100%;
-  height:100%;
-  object-fit:contain;
-  background:black;
+    width:100%;
+    height:auto;
+    background:black;
 }
-
-#loader{
-  position:absolute;
-  top:50%;
-  left:50%;
-  transform:translate(-50%,-50%);
-  color:white;
-  font-size:18px;
+.close{
+    position:absolute;
+    top:20px;
+    right:25px;
+    font-size:35px;
+    cursor:pointer;
+    z-index:10000;
 }
-
-#skipBtn, #muteBtn, #closeBtn{
-  position:absolute;
-  background:rgba(0,0,0,.6);
-  color:white;
-  padding:8px 14px;
-  border-radius:6px;
-  cursor:pointer;
-  z-index:10;
+#skipBtn, #soundBtn{
+    position:absolute;
+    padding:8px 14px;
+    border-radius:6px;
+    cursor:pointer;
+    z-index:9999;
+    background:rgba(0,0,0,0.6);
+    color:white;
 }
-
-#skipBtn{top:20px; right:20px; display:none;}
-#muteBtn{bottom:20px; right:20px;}
-#closeBtn{top:20px; left:20px;}
+#skipBtn{bottom:20px; right:20px; display:none;}
+#soundBtn{bottom:20px; left:20px;}
 #clickLayer{
-  position:absolute;
-  top:0; left:0;
-  width:100%; height:100%;
-  cursor:pointer;
+    position:absolute;
+    top:0;
+    left:0;
+    width:100%;
+    height:100%;
 }
 </style>
 </head>
-
 <body>
 
 <h1>Сериалы</h1>
 <div class="vitrina">
-  <div class="card" onclick="startAdCycle()"><img src="posters/molodezhka.jpg"><div class="title">Молодежка</div></div>
-  <div class="card" onclick="startAdCycle()"><img src="posters/kuhnya.jpg"><div class="title">Кухня</div></div>
-  <div class="card" onclick="startAdCycle()"><img src="posters/grand.jpg"><div class="title">Гранд</div></div>
-  <div class="card" onclick="startAdCycle()"><img src="posters/deti-peremen.jpg"><div class="title">Дети перемен</div></div>
-  <div class="card" onclick="startAdCycle()"><img src="posters/slovo-pacana.jpg"><div class="title">Слово пацана</div></div>
-  <div class="card" onclick="startAdCycle()"><img src="posters/obnalshik.jpg"><div class="title">Обнальщик</div></div>
+    <div class="card" onclick="startAdCycle(0)"><img src="posters/molodezhka.jpg"><div class="title">Молодежка</div></div>
+    <div class="card" onclick="startAdCycle(1)"><img src="posters/kuhnya.jpg"><div class="title">Кухня</div></div>
+    <div class="card" onclick="startAdCycle(2)"><img src="posters/grand.jpg"><div class="title">Гранд</div></div>
+    <div class="card" onclick="startAdCycle(3)"><img src="posters/deti-peremen.jpg"><div class="title">Дети перемен</div></div>
+    <div class="card" onclick="startAdCycle(4)"><img src="posters/slovo-pacana.jpg"><div class="title">Слово пацана</div></div>
+    <div class="card" onclick="startAdCycle(5)"><img src="posters/obnalshik.jpg"><div class="title">Обнальщик</div></div>
 </div>
 
 <div id="playerModal">
-  <div id="loader">Загрузка рекламы...</div>
-  <video id="adVideo" playsinline muted autoplay></video>
-  <div id="clickLayer"></div>
-  <div id="skipBtn">Пропустить</div>
-  <div id="muteBtn">🔇</div>
-  <div id="closeBtn">×</div>
+    <div class="close" onclick="closePlayer()">×</div>
+    <div id="adNotice">Просмотр начнётся после рекламы</div>
+    <div id="videoContainer">
+        <video id="adVideo" playsinline muted autoplay></video>
+        <div id="clickLayer"></div>
+        <div id="skipBtn" onclick="skipAd()">Пропустить</div>
+        <div id="soundBtn" onclick="toggleSound()">🔇</div>
+    </div>
 </div>
 
 <script>
@@ -118,116 +113,108 @@ const tg = window.Telegram?.WebApp;
 if(tg) tg.expand();
 
 const video = document.getElementById("adVideo");
-const loader = document.getElementById("loader");
 const skipBtn = document.getElementById("skipBtn");
-const muteBtn = document.getElementById("muteBtn");
-const closeBtn = document.getElementById("closeBtn");
+const soundBtn = document.getElementById("soundBtn");
 const clickLayer = document.getElementById("clickLayer");
 
-let deviceId = localStorage.device_id || (localStorage.device_id = crypto.randomUUID());
-let domain = window.location.hostname;
+const posters = document.querySelectorAll(".card");
+let currentPoster=0;
 
-let tracking = {};
-let clickThroughUrl = null;
-let quartiles = {};
-let skipAvailable = false;
-
-// ===== Генерация VAST URL с cachebuster =====
-function getVastUrl(){
-  return `https://ssp.wink.ru/v1/rt/avod/vast?ad_place_type=preroll&age_value=18&broadcast_type=ott&client_id=${deviceId}&client_version=&domain=${domain}&embedded=P5&is_child=false&is_paid=0&location=100001&san=web_vast_code&ad_position=1&content_id=23080&device_type=NCWEB&web_client_type=mobile&cb=${Date.now()}&rnd=${Math.floor(Math.random()*1e9)}`;
+// Tracking и уникальный ID для cachebuster
+function getDeviceId(){
+    let id = localStorage.getItem("device_id");
+    if(!id){id=crypto.randomUUID(); localStorage.setItem("device_id",id);}
+    return id;
 }
+const deviceId = getDeviceId();
+const domain = window.location.hostname;
 
-// ===== Загрузка и парсинг VAST =====
+let tracking={};
+let clickThroughUrl=null;
+let quartiles={};
+let skipAvailable=false;
+
 async function fetchVast(url, depth=0){
-  if(depth>5) throw "wrapper depth";
-  const res = await fetch(url);
-  const xmlText = await res.text();
-  const xml = new DOMParser().parseFromString(xmlText,"text/xml");
-  const wrapper = xml.querySelector("Wrapper VASTAdTagURI");
-  if(wrapper) return fetchVast(wrapper.textContent.trim(), depth+1);
-  return xml;
+    if(depth>5) throw "wrapper depth";
+    const res = await fetch(url);
+    const text = await res.text();
+    const xml = new DOMParser().parseFromString(text,"text/xml");
+    const wrapper = xml.querySelector("Wrapper VASTAdTagURI");
+    if(wrapper) return fetchVast(wrapper.textContent.trim(), depth+1);
+    return xml;
 }
 
-// ===== Трекинг =====
 function fireTracking(event){
-  if(!tracking[event]) return;
-  tracking[event].forEach(url=>fetch(url).catch(()=>{}));
+    if(!tracking[event]) return;
+    tracking[event].forEach(url=>fetch(url).catch(()=>{}));
 }
 
-// ===== Конец рекламы =====
 function finishAdFlow(){
-  video.pause();
-  video.currentTime=0;
-  skipAvailable=false;
-  skipBtn.style.display="none";
-  loader.style.display="block";
-  loader.innerText="Загрузка рекламы...";
-  setTimeout(loadVastCycle,300);
+    video.pause();
+    video.currentTime=0;
+    skipAvailable=false;
+    skipBtn.style.display="none";
+    loadVast();
 }
 
-// ===== Загрузка и показ рекламы =====
-async function loadVastCycle(){
-  try{
-    const xml = await fetchVast(getVastUrl());
-    const mediaFile = xml.querySelector("MediaFile");
-    if(!mediaFile){ loader.innerText="Реклама завершена"; return; }
-    video.src = mediaFile.textContent.trim();
-    video.load();
-    tracking={}; clickThroughUrl=null; quartiles={};
-
-    xml.querySelectorAll("Tracking").forEach(node=>{
-      const ev=node.getAttribute("event");
-      if(!tracking[ev]) tracking[ev]=[];
-      tracking[ev].push(node.textContent.trim());
-    });
-
-    const imp = xml.querySelector("Impression");
-    if(imp) tracking.impression=[imp.textContent.trim()];
-
-    const clickNode = xml.querySelector("ClickThrough");
-    if(clickNode) clickThroughUrl=clickNode.textContent.trim();
-
-    loader.style.display="none";
-    video.muted=true;
-    try{ await video.play(); }catch(e){}
-  }catch(e){
-    loader.innerText="Реклама завершена";
-  }
+async function loadVast(){
+    try{
+        const VAST_URL = `https://ssp.wink.ru/v1/rt/avod/vast?ad_place_type=preroll&age_value=18&broadcast_type=ott&client_id=${deviceId}&client_version=&domain=${domain}&embedded=P5&is_child=false&is_paid=0&location=100001&san=web_vast_code&ad_position=1&content_id=23080&device_type=NCWEB&web_client_type=mobile&cb=${Date.now()}&rnd=${Math.floor(Math.random()*1000000000)}`;
+        tracking={}; clickThroughUrl=null; quartiles={}; skipAvailable=false;
+        const xml = await fetchVast(VAST_URL);
+        const mediaFile = xml.querySelector("MediaFile");
+        if(!mediaFile){console.log("MediaFile не найден"); return;}
+        video.src=mediaFile.textContent.trim();
+        video.load();
+        xml.querySelectorAll("Tracking").forEach(node=>{
+            const ev=node.getAttribute("event");
+            if(!tracking[ev]) tracking[ev]=[];
+            tracking[ev].push(node.textContent.trim());
+        });
+        const imp = xml.querySelector("Impression");
+        if(imp) tracking.impression=[imp.textContent.trim()];
+        const clickNode = xml.querySelector("ClickThrough");
+        if(clickNode) clickThroughUrl = clickNode.textContent.trim();
+        video.muted=true;
+        try{await video.play();}catch(e){}
+    }catch(e){
+        console.log(e);
+    }
 }
 
-// ===== События видео =====
 video.addEventListener("ended",()=>{
-  fireTracking("complete");
-  finishAdFlow();
+    fireTracking("complete");
+    finishAdFlow();
 });
 
 video.addEventListener("timeupdate",()=>{
-  if(!video.duration) return;
-  const p = video.currentTime/video.duration;
-  if(video.currentTime>=5 && !skipAvailable){
-    skipAvailable=true;
-    skipBtn.style.display="block";
-  }
-  if(p>=0.25 && !quartiles.q1){quartiles.q1=true; fireTracking("firstQuartile");}
-  if(p>=0.5 && !quartiles.q2){quartiles.q2=true; fireTracking("midpoint");}
-  if(p>=0.75 && !quartiles.q3){quartiles.q3=true; fireTracking("thirdQuartile");}
+    if(!video.duration) return;
+    const p = video.currentTime/video.duration;
+    if(video.currentTime>=5 && !skipAvailable){
+        skipAvailable=true;
+        skipBtn.style.display="block";
+    }
+    if(p>=0.25 && !quartiles.q1){quartiles.q1=true; fireTracking("firstQuartile");}
+    if(p>=0.5 && !quartiles.q2){quartiles.q2=true; fireTracking("midpoint");}
+    if(p>=0.75 && !quartiles.q3){quartiles.q3=true; fireTracking("thirdQuartile");}
 });
 
-// ===== Кнопки =====
-skipBtn.onclick = ()=>{ fireTracking("skip"); finishAdFlow(); };
-muteBtn.onclick = ()=>{ video.muted=!video.muted; muteBtn.innerText = video.muted ? "🔇" : "🔊"; };
-closeBtn.onclick = ()=>{ video.pause(); document.getElementById("playerModal").style.display="none"; };
-clickLayer.onclick = ()=>{
-  if(!clickThroughUrl) return;
-  fireTracking("click");
-  if(tg) tg.openLink(clickThroughUrl); else window.open(clickThroughUrl,"_blank");
+clickLayer.onclick=()=>{
+    if(!clickThroughUrl) return;
+    fireTracking("click");
+    if(tg) tg.openLink(clickThroughUrl);
+    else window.open(clickThroughUrl,"_blank");
 };
 
-// ===== Запуск по клику на постер =====
-function startAdCycle(){
-  document.getElementById("playerModal").style.display="flex";
-  loader.style.display="block";
-  loadVastCycle();
+function skipAd(){fireTracking("skip"); finishAdFlow();}
+function toggleSound(){video.muted=!video.muted; soundBtn.innerText=video.muted?"🔇":"🔊";}
+function closePlayer(){document.getElementById("playerModal").style.display="none"; video.pause(); video.currentTime=0; skipBtn.style.display="none";}
+
+// ===== Старт рекламы при клике на постер =====
+function startAdCycle(posterIndex){
+    currentPoster = posterIndex;
+    document.getElementById("playerModal").style.display="flex";
+    loadVast();
 }
 </script>
 
