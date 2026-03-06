@@ -3,13 +3,13 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>TMA Ad Engine</title>
+<title>TMA Wink Player</title>
 
 <style>
 html,body{
     margin:0;
     padding:0;
-    background:#000;
+    background:black;
     height:100%;
     overflow:hidden;
     font-family:Arial;
@@ -19,7 +19,7 @@ video{
     width:100%;
     height:100%;
     object-fit:contain;
-    background:#000;
+    background:black;
 }
 
 #loader{
@@ -85,46 +85,45 @@ const skipBtn = document.getElementById("skipBtn");
 const muteBtn = document.getElementById("muteBtn");
 const clickLayer = document.getElementById("clickLayer");
 
-let tracking = {};
-let clickThroughUrl = null;
-let quartilesFired = {};
-let skipAvailable = false;
-
-// ================= CONFIG =================
-
-const POSTBACK_URL = "https://your-postback-endpoint.com/postback";
+/* ================= DEVICE / DOMAIN ================= */
 
 const deviceId = localStorage.device_id ||
-                 (localStorage.device_id = crypto.randomUUID());
+    (localStorage.device_id = crypto.randomUUID());
 
-const domain = location.hostname;
+const domain = window.location.hostname;
 
-// ===== VAST SOURCE (ОБЯЗАТЕЛЬНО ЗАМЕНИ) =====
+/* ================= SSP VAST TEMPLATE ================= */
 
-const VAST_URL = "PUT_YOUR_VAST_HERE";
+const VAST_URL = `https://ssp.wink.ru/v1/rt/avod/vast?ad_place_type=preroll&age_value=18&broadcast_type=ott&client_id=${deviceId}&client_version=&domain=${domain}&embedded=P5&is_child=false&is_paid=0&location=100001&san=web_vast_code&ad_position=1&content_id=23080&device_type=NCWEB&web_client_type=mobile`.replace(/\s+/g,'');
 
-// ================= LOGGING =================
+/* ================= STATE ================= */
 
-function logEvent(event,data={}){
+let tracking = {};
+let clickThroughUrl = null;
+let quartiles = {};
+let skipAvailable = false;
 
-    try{
+/* ================= FETCH ================= */
 
-        fetch(POSTBACK_URL,{
-            method:"POST",
-            headers:{ "Content-Type":"application/json" },
-            body:JSON.stringify({
-                event,
-                device_id:deviceId,
-                timestamp:Date.now(),
-                ...data
-            })
-        }).catch(()=>{});
+async function fetchVast(url, depth=0){
 
-    }catch(e){}
+    if(depth>5) throw "wrapper depth";
 
+    const res = await fetch(url);
+    const text = await res.text();
+
+    const xml = new DOMParser().parseFromString(text,"text/xml");
+
+    const wrapper = xml.querySelector("Wrapper VASTAdTagURI");
+
+    if(wrapper){
+        return fetchVast(wrapper.textContent.trim(), depth+1);
+    }
+
+    return xml;
 }
 
-// ================= TRACKING =================
+/* ================= TRACKING ================= */
 
 function fireTracking(event){
 
@@ -134,63 +133,25 @@ function fireTracking(event){
         fetch(url).catch(()=>{});
     });
 
-    logEvent(event);
-
 }
 
-// ================= FETCH WITH TIMEOUT =================
-
-function fetchTimeout(url,timeout=8000){
-
-    return Promise.race([
-        fetch(url),
-        new Promise((_,rej)=>setTimeout(()=>rej("timeout"),timeout))
-    ]);
-
-}
-
-// ================= WRAPPER RESOLVER =================
-
-async function fetchVast(url,depth=0){
-
-    if(depth>5) throw "wrapper depth";
-
-    const res = await fetchTimeout(url);
-
-    const text = await res.text();
-
-    const xml = new DOMParser().parseFromString(text,"text/xml");
-
-    const wrapper = xml.querySelector("Wrapper VASTAdTagURI");
-
-    if(wrapper){
-        return fetchVast(wrapper.textContent.trim(),depth+1);
-    }
-
-    return xml;
-}
-
-// ================= FINISH FLOW =================
+/* ================= FLOW ================= */
 
 function finishAdFlow(){
 
     video.pause();
     video.currentTime = 0;
 
-    quartilesFired = {};
-    skipAvailable = false;
-
+    skipAvailable=false;
     skipBtn.style.display="none";
 
     loader.style.display="block";
     loader.innerText="Загрузка рекламы...";
 
-    setTimeout(()=>{
-        loadVast();
-    },300);
+    setTimeout(loadVast,300);
 }
 
-// ================= LOAD VAST =================
+/* ================= LOAD VAST ================= */
 
 async function loadVast(){
 
@@ -210,6 +171,7 @@ async function loadVast(){
 
         tracking = {};
         clickThroughUrl = null;
+        quartiles = {};
 
         xml.querySelectorAll("Tracking").forEach(node=>{
             const ev = node.getAttribute("event");
@@ -229,23 +191,18 @@ async function loadVast(){
 
         try{
             await video.play();
-        }catch(e){
-            console.log("Autoplay recovery");
-        }
+        }catch(e){}
 
     }catch(e){
-
-        console.log(e);
-        loader.innerText="Ошибка загрузки рекламы";
-
+        loader.innerText="Реклама завершена";
     }
 }
 
-// ================= VIDEO EVENTS =================
+/* ================= EVENTS ================= */
 
-video.addEventListener("play",()=>{
-    fireTracking("impression");
-    fireTracking("start");
+video.addEventListener("ended",()=>{
+    fireTracking("complete");
+    finishAdFlow();
 });
 
 video.addEventListener("timeupdate",()=>{
@@ -259,29 +216,24 @@ video.addEventListener("timeupdate",()=>{
         skipBtn.style.display="block";
     }
 
-    if(p>=0.25 && !quartilesFired.q1){
-        quartilesFired.q1=true;
+    if(p>=0.25 && !quartiles.q1){
+        quartiles.q1=true;
         fireTracking("firstQuartile");
     }
 
-    if(p>=0.5 && !quartilesFired.q2){
-        quartilesFired.q2=true;
+    if(p>=0.5 && !quartiles.q2){
+        quartiles.q2=true;
         fireTracking("midpoint");
     }
 
-    if(p>=0.75 && !quartilesFired.q3){
-        quartilesFired.q3=true;
+    if(p>=0.75 && !quartiles.q3){
+        quartiles.q3=true;
         fireTracking("thirdQuartile");
     }
 
 });
 
-video.addEventListener("ended",()=>{
-    fireTracking("complete");
-    finishAdFlow();
-});
-
-// ================= CONTROLS =================
+/* ================= CONTROLS ================= */
 
 skipBtn.onclick=()=>{
     fireTracking("skip");
@@ -293,25 +245,23 @@ muteBtn.onclick=()=>{
     muteBtn.innerText = video.muted ? "🔇" : "🔊";
 };
 
-// ================= CLICK =================
+/* ================= CLICK ================= */
 
 clickLayer.onclick=()=>{
 
     if(!clickThroughUrl) return;
 
     fireTracking("click");
-    logEvent("click",{url:clickThroughUrl});
 
     if(tg) tg.openLink(clickThroughUrl);
     else window.open(clickThroughUrl,"_blank");
 
 };
 
-// ================= START =================
+/* ================= START ================= */
 
 loadVast();
 
 </script>
-
 </body>
 </html>
