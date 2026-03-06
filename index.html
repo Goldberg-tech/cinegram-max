@@ -4,7 +4,7 @@
 
 <meta charset="UTF-8">
 
-<script src="https://telegram.org/js/telegram-web-app.js"></script>
+<script src="https://imasdk.googleapis.com/js/sdkloader/ima3.js"></script>
 
 <style>
 
@@ -13,7 +13,7 @@ margin:0;
 background:black;
 }
 
-video{
+#video{
 width:100vw;
 height:100vh;
 object-fit:cover;
@@ -25,57 +25,53 @@ object-fit:cover;
 
 <body>
 
-<video id="player" autoplay muted playsinline controls></video>
+<video id="video" autoplay muted playsinline></video>
 
 <script>
 
-const vastUrl =
+const vastTag =
 "https://ssp.wink.ru/v1/rt/avod/vast?ad_place_type=preroll&age_value=18&broadcast_type=ott&client_id=test123&client_version=&domain=localhost&embedded=P5&is_child=false&is_paid=0&location=100001&san=web_vast_code&ad_position=1&content_id=23080&device_type=NCWEB&web_client_type=mobile";
 
-async function loadVast(url){
+const video = document.getElementById("video");
 
-const res = await fetch(url);
-const text = await res.text();
+const adDisplayContainer = new google.ima.AdDisplayContainer(document.body, video);
 
-const xml = new DOMParser().parseFromString(text,"text/xml");
+const adsLoader = new google.ima.AdsLoader(adDisplayContainer);
 
-const wrapper = xml.querySelector("VASTAdTagURI");
+const adsRequest = new google.ima.AdsRequest();
 
-if(wrapper){
+adsRequest.adTagUrl = vastTag;
 
-const next = wrapper.textContent.trim();
+adsRequest.linearAdSlotWidth = window.innerWidth;
+adsRequest.linearAdSlotHeight = window.innerHeight;
 
-console.log("Wrapper ->",next);
+adsLoader.addEventListener(
+google.ima.AdsManagerLoadedEvent.Type.ADS_MANAGER_LOADED,
+onAdsManagerLoaded
+);
 
-return loadVast(next);
+adsLoader.addEventListener(
+google.ima.AdErrorEvent.Type.AD_ERROR,
+onAdError
+);
 
-}
+adsLoader.requestAds(adsRequest);
 
-const media = xml.querySelector("MediaFile");
+function onAdsManagerLoaded(event){
 
-if(media){
+const adsManager = event.getAdsManager(video);
 
-const videoUrl = media.textContent.trim();
+adsManager.init(window.innerWidth,window.innerHeight,google.ima.ViewMode.NORMAL);
 
-console.log("Ad video:",videoUrl);
-
-const player = document.getElementById("player");
-
-player.src = videoUrl;
-
-player.play();
-
-}
-
-else{
-
-console.log("No media file");
+adsManager.start();
 
 }
 
-}
+function onAdError(e){
 
-loadVast(vastUrl);
+console.log("Ad error",e);
+
+}
 
 </script>
 
