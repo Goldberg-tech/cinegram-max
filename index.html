@@ -1,5 +1,6 @@
 <!DOCTYPE html>
 <html lang="ru">
+
 <head>
 
 <meta charset="UTF-8">
@@ -72,7 +73,7 @@ position:relative;
 
 video{
 width:100%;
-display:block;
+height:auto;
 }
 
 .close{
@@ -82,6 +83,16 @@ right:25px;
 font-size:35px;
 cursor:pointer;
 z-index:10000;
+}
+
+#adText{
+position:absolute;
+top:20px;
+left:20px;
+background:rgba(0,0,0,0.6);
+padding:10px 15px;
+border-radius:10px;
+z-index:9999;
 }
 
 #adTimer{
@@ -106,7 +117,6 @@ color:white;
 border-radius:8px;
 display:none;
 z-index:9999;
-cursor:pointer;
 }
 
 </style>
@@ -157,7 +167,9 @@ cursor:pointer;
 
 <div id="videoContainer">
 
-<video id="video" playsinline webkit-playsinline></video>
+<div id="adText">Просмотр начнется после рекламы</div>
+
+<video id="video" playsinline autoplay></video>
 
 <div id="adContainer"></div>
 
@@ -175,7 +187,14 @@ let adDisplayContainer
 let adsLoader
 let adsManager
 
+let adCount = 0
+let maxAds = 3
+
+let timerInterval
+
 function playAd(){
+
+adCount = 0
 
 document.getElementById("playerModal").style.display="flex"
 
@@ -183,6 +202,15 @@ let video = document.getElementById("video")
 let adContainer = document.getElementById("adContainer")
 
 adContainer.innerHTML=""
+
+startAdRequest()
+
+}
+
+function startAdRequest(){
+
+let video = document.getElementById("video")
+let adContainer = document.getElementById("adContainer")
 
 let uid = localStorage.getItem("uid")
 
@@ -211,6 +239,8 @@ let vastUrl =
 +"&content_id=23080"
 +"&device_type=NCWEB"
 +"&web_client_type="+device
++"&cb="+Date.now()
++"&rnd="+Math.floor(Math.random()*1000000000)
 
 adDisplayContainer = new google.ima.AdDisplayContainer(adContainer, video)
 
@@ -252,6 +282,74 @@ google.ima.ViewMode.NORMAL
 
 adsManager.start()
 
+adsManager.addEventListener(
+google.ima.AdEvent.Type.COMPLETE,
+onAdComplete
+)
+
+adsManager.addEventListener(
+google.ima.AdEvent.Type.STARTED,
+startAdTimer
+)
+
+}
+
+function onAdComplete(){
+
+clearInterval(timerInterval)
+
+document.getElementById("skipAd").style.display="none"
+
+adCount++
+
+if(adCount < maxAds){
+
+startAdRequest()
+
+}else{
+
+closePlayer()
+
+}
+
+}
+
+function startAdTimer(){
+
+let timer = document.getElementById("adTimer")
+
+setTimeout(()=>{
+
+document.getElementById("skipAd").style.display="block"
+
+},5000)
+
+timerInterval = setInterval(()=>{
+
+if(!adsManager) return
+
+let remaining = Math.round(adsManager.getRemainingTime())
+
+timer.innerText = "Реклама: "+remaining+" сек"
+
+if(remaining <= 0){
+
+clearInterval(timerInterval)
+
+}
+
+},500)
+
+}
+
+function skipAd(){
+
+if(adsManager){
+
+adsManager.stop()
+
+}
+
 }
 
 function onAdError(error){
@@ -266,6 +364,10 @@ function closePlayer(){
 
 document.getElementById("playerModal").style.display="none"
 
+clearInterval(timerInterval)
+
+document.getElementById("skipAd").style.display="none"
+
 if(adsManager){
 adsManager.destroy()
 adsManager = null
@@ -276,4 +378,5 @@ adsManager = null
 </script>
 
 </body>
+
 </html>
