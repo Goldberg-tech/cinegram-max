@@ -60,15 +60,9 @@ width:100%;
 height:100%;
 background:black;
 display:none;
-flex-direction:column;
 align-items:center;
 justify-content:center;
 z-index:9999;
-}
-
-#adTopText{
-margin-bottom:15px;
-font-size:18px;
 }
 
 #videoContainer{
@@ -89,6 +83,16 @@ right:25px;
 font-size:35px;
 cursor:pointer;
 z-index:10000;
+}
+
+#adText{
+position:absolute;
+top:20px;
+left:20px;
+background:rgba(0,0,0,0.6);
+padding:10px 15px;
+border-radius:10px;
+z-index:9999;
 }
 
 #adTimer{
@@ -113,20 +117,6 @@ color:white;
 border-radius:8px;
 display:none;
 z-index:9999;
-cursor:pointer;
-}
-
-#soundBtn{
-position:absolute;
-top:20px;
-right:80px;
-background:rgba(0,0,0,0.7);
-border:none;
-color:white;
-padding:8px 14px;
-border-radius:8px;
-cursor:pointer;
-z-index:9999;
 }
 
 </style>
@@ -139,32 +129,32 @@ z-index:9999;
 
 <div class="vitrina">
 
-<div class="card" onclick="openPlayer()">
+<div class="card" onclick="playAd()">
 <img src="posters/molodezhka.jpg">
 <div class="title">Молодежка</div>
 </div>
 
-<div class="card" onclick="openPlayer()">
+<div class="card" onclick="playAd()">
 <img src="posters/kuhnya.jpg">
 <div class="title">Кухня</div>
 </div>
 
-<div class="card" onclick="openPlayer()">
+<div class="card" onclick="playAd()">
 <img src="posters/grand.jpg">
 <div class="title">Гранд</div>
 </div>
 
-<div class="card" onclick="openPlayer()">
+<div class="card" onclick="playAd()">
 <img src="posters/deti-peremen.jpg">
 <div class="title">Дети перемен</div>
 </div>
 
-<div class="card" onclick="openPlayer()">
+<div class="card" onclick="playAd()">
 <img src="posters/slovo-pacana.jpg">
 <div class="title">Слово пацана</div>
 </div>
 
-<div class="card" onclick="openPlayer()">
+<div class="card" onclick="playAd()">
 <img src="posters/obnalshik.jpg">
 <div class="title">Обнальщик</div>
 </div>
@@ -175,11 +165,9 @@ z-index:9999;
 
 <div class="close" onclick="closePlayer()">×</div>
 
-<div id="adTopText">Просмотр начнется после рекламы</div>
-
 <div id="videoContainer">
 
-<button id="soundBtn" onclick="toggleSound()">🔇</button>
+<div id="adText">Просмотр начнется после рекламы</div>
 
 <video id="video" playsinline autoplay></video>
 
@@ -206,17 +194,13 @@ let timerInterval
 
 function playAd(){
 
-// очищаем предыдущую рекламу
-if(adsManager){
-adsManager.destroy()
-adsManager = null
-}
-
 adCount = 0
 
 document.getElementById("playerModal").style.display="flex"
 
+let video = document.getElementById("video")
 let adContainer = document.getElementById("adContainer")
+
 adContainer.innerHTML=""
 
 startAdRequest()
@@ -236,6 +220,7 @@ localStorage.setItem("uid", uid)
 }
 
 let device = /Android|iPhone/i.test(navigator.userAgent) ? "mobile" : "desktop"
+
 let domain = window.location.hostname
 
 let vastUrl =
@@ -315,15 +300,14 @@ clearInterval(timerInterval)
 
 document.getElementById("skipAd").style.display="none"
 
-// уничтожаем предыдущий AdsManager
+adCount++
+
+if(adCount < maxAds){
+
 if(adsManager){
 adsManager.destroy()
 adsManager = null
 }
-
-adCount++
-
-if(adCount < maxAds){
 
 startAdRequest()
 
@@ -365,14 +349,26 @@ clearInterval(timerInterval)
 
 function skipAd(){
 
+clearInterval(timerInterval)
+
+document.getElementById("skipAd").style.display="none"
+
+adCount++
+
+if(adCount < maxAds){
+
 if(adsManager){
-
-adsManager.stop()
-
+adsManager.destroy()
+adsManager = null
 }
 
-// запускаем следующий ролик
-onAdComplete()
+startAdRequest()
+
+}else{
+
+closePlayer()
+
+}
 
 }
 
@@ -402,5 +398,4 @@ adsManager = null
 </script>
 
 </body>
-
 </html>
