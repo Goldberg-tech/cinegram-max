@@ -1,77 +1,122 @@
 <!DOCTYPE html>
-<html>
+<html lang="ru">
 <head>
-
 <meta charset="UTF-8">
+<title>VAST Test</title>
 
 <script src="https://imasdk.googleapis.com/js/sdkloader/ima3.js"></script>
 
 <style>
-
 body{
 margin:0;
 background:black;
-}
-
-#video{
-width:100vw;
+display:flex;
+justify-content:center;
+align-items:center;
 height:100vh;
-object-fit:cover;
 }
 
-</style>
+#videoContainer{
+position:relative;
+width:90vw;
+max-width:900px;
+}
 
+video{
+width:100%;
+}
+
+#adContainer{
+position:absolute;
+top:0;
+left:0;
+width:100%;
+height:100%;
+}
+</style>
 </head>
 
 <body>
 
-<video id="video" autoplay muted playsinline></video>
+<div id="videoContainer">
+
+<video id="contentVideo" autoplay muted playsinline></video>
+
+<div id="adContainer"></div>
+
+</div>
 
 <script>
 
+function generateUID(){
+return 'uid-'+Math.random().toString(36).substring(2)+Date.now();
+}
+
+const uid = generateUID();
+const domain = "localhost";
+
 const vastTag =
-"https://ssp.wink.ru/v1/rt/avod/vast?ad_place_type=preroll&age_value=18&broadcast_type=ott&client_id=test123&client_version=&domain=localhost&embedded=P5&is_child=false&is_paid=0&location=100001&san=web_vast_code&ad_position=1&content_id=23080&device_type=NCWEB&web_client_type=mobile";
+"https://ssp.wink.ru/v1/rt/avod/vast?ad_place_type=preroll&age_value=18&broadcast_type=ott&client_id="+uid+"&client_version=&domain="+domain+"&embedded=P5&is_child=false&is_paid=0&location=100001&san=web_vast_code&ad_position=1&content_id=23080&device_type=NCWEB&web_client_type=desktop";
 
-const video = document.getElementById("video");
+const video = document.getElementById("contentVideo");
+const adContainer = document.getElementById("adContainer");
 
-const adDisplayContainer = new google.ima.AdDisplayContainer(document.body, video);
-
+const adDisplayContainer = new google.ima.AdDisplayContainer(adContainer, video);
 const adsLoader = new google.ima.AdsLoader(adDisplayContainer);
+
+function initAds(){
+
+adDisplayContainer.initialize();
 
 const adsRequest = new google.ima.AdsRequest();
 
 adsRequest.adTagUrl = vastTag;
 
-adsRequest.linearAdSlotWidth = window.innerWidth;
-adsRequest.linearAdSlotHeight = window.innerHeight;
+adsRequest.linearAdSlotWidth = 640;
+adsRequest.linearAdSlotHeight = 360;
+
+adsLoader.requestAds(adsRequest);
+
+}
 
 adsLoader.addEventListener(
 google.ima.AdsManagerLoadedEvent.Type.ADS_MANAGER_LOADED,
-onAdsManagerLoaded
+onAdsManagerLoaded,
+false
 );
 
 adsLoader.addEventListener(
 google.ima.AdErrorEvent.Type.AD_ERROR,
-onAdError
+onAdError,
+false
 );
-
-adsLoader.requestAds(adsRequest);
 
 function onAdsManagerLoaded(event){
 
 const adsManager = event.getAdsManager(video);
 
-adsManager.init(window.innerWidth,window.innerHeight,google.ima.ViewMode.NORMAL);
+try{
 
+adsManager.init(640,360,google.ima.ViewMode.NORMAL);
 adsManager.start();
 
-}
+}catch(e){
 
-function onAdError(e){
-
-console.log("Ad error",e);
+console.log(e);
 
 }
+
+}
+
+function onAdError(error){
+
+console.log("Ad error",error);
+
+}
+
+video.addEventListener("play",initAds);
+
+video.play();
 
 </script>
 
