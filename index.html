@@ -1,354 +1,160 @@
 <!DOCTYPE html>
 <html lang="ru">
-
 <head>
-
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-
 <title>Кинотеатр</title>
-
-<script src="https://imasdk.googleapis.com/js/sdkloader/ima3.js"></script>
-
 <style>
-
-body{
-margin:0;
-background:#0f0f0f;
-color:white;
-font-family:Arial;
-}
-
-h1{
-padding:20px;
-margin:0;
-}
-
-.vitrina{
-display:flex;
-gap:20px;
-overflow-x:auto;
-padding:20px;
-}
-
-.vitrina::-webkit-scrollbar{
-display:none;
-}
-
-.card{
-min-width:65vw;
-cursor:pointer;
-}
-
-.card img{
-width:65vw;
-height:90vw;
-object-fit:cover;
-border-radius:20px;
-}
-
-.title{
-margin-top:10px;
-font-size:18px;
-}
-
-#playerModal{
-position:fixed;
-top:0;
-left:0;
-width:100%;
-height:100%;
-background:black;
-display:none;
-align-items:center;
-justify-content:center;
-z-index:9999;
-}
-
-#videoContainer{
-width:100%;
-max-width:900px;
-position:relative;
-}
-
-video{
-width:100%;
-height:auto;
-}
-
-#adContainer{
-position:absolute;
-top:0;
-left:0;
-width:100%;
-height:100%;
-}
-
-.close{
-position:absolute;
-top:20px;
-right:25px;
-font-size:35px;
-cursor:pointer;
-z-index:10000;
-}
-
-#adText{
-position:absolute;
-top:20px;
-left:20px;
-background:rgba(0,0,0,0.6);
-padding:10px 15px;
-border-radius:10px;
-z-index:9999;
-}
-
-#adTimer{
-position:absolute;
-bottom:20px;
-left:20px;
-background:rgba(0,0,0,0.6);
-padding:8px 12px;
-border-radius:8px;
-font-size:14px;
-z-index:9999;
-}
-
-#skipAd{
-position:absolute;
-bottom:20px;
-right:20px;
-background:#ff0000;
-border:none;
-padding:10px 16px;
-color:white;
-border-radius:8px;
-display:none;
-z-index:9999;
-}
-
+body { margin:0; background:#0f0f0f; color:white; font-family:Arial; }
+h1 { padding:20px; margin:0; }
+.vitrina { display:flex; gap:20px; overflow-x:auto; padding:20px; }
+.vitrina::-webkit-scrollbar { display:none; }
+.card { min-width:65vw; cursor:pointer; }
+.card img { width:65vw; height:90vw; object-fit:cover; border-radius:20px; }
+.title { margin-top:10px; font-size:18px; }
+#playerModal { position:fixed; top:0; left:0; width:100%; height:100%; background:black; display:none; align-items:center; justify-content:center; z-index:9999; flex-direction:column; }
+#adText { margin-bottom:10px; font-size:18px; }
+#videoContainer { width:100%; max-width:900px; position:relative; }
+video { width:100%; height:auto; background:black; }
+.close { position:absolute; top:20px; right:25px; font-size:35px; cursor:pointer; z-index:10000; }
+#adTimer { position:absolute; bottom:20px; left:20px; background:rgba(0,0,0,0.6); padding:8px 12px; border-radius:8px; font-size:14px; z-index:9999; }
+#skipAd { position:absolute; bottom:20px; right:20px; background:#ff0000; border:none; padding:10px 16px; color:white; border-radius:8px; display:none; z-index:9999; }
+#soundBtn { position:absolute; top:20px; left:20px; background:#222; color:white; border:none; padding:8px 12px; border-radius:6px; z-index:9999; cursor:pointer; }
 </style>
-
 </head>
-
 <body>
 
 <h1>Сериалы</h1>
-
 <div class="vitrina">
-
-<div class="card" onclick="playAd()">
-<img src="posters/molodezhka.jpg">
-<div class="title">Молодежка</div>
-</div>
-
-<div class="card" onclick="playAd()">
-<img src="posters/kuhnya.jpg">
-<div class="title">Кухня</div>
-</div>
-
-<div class="card" onclick="playAd()">
-<img src="posters/grand.jpg">
-<div class="title">Гранд</div>
-</div>
-
-<div class="card" onclick="playAd()">
-<img src="posters/deti-peremen.jpg">
-<div class="title">Дети перемен</div>
-</div>
-
-<div class="card" onclick="playAd()">
-<img src="posters/slovo-pacana.jpg">
-<div class="title">Слово пацана</div>
-</div>
-
-<div class="card" onclick="playAd()">
-<img src="posters/obnalshik.jpg">
-<div class="title">Обнальщик</div>
-</div>
-
+  <div class="card" onclick="playAd(0)"><img src="posters/molodezhka.jpg"><div class="title">Молодежка</div></div>
+  <div class="card" onclick="playAd(1)"><img src="posters/kuhnya.jpg"><div class="title">Кухня</div></div>
+  <div class="card" onclick="playAd(2)"><img src="posters/grand.jpg"><div class="title">Гранд</div></div>
+  <div class="card" onclick="playAd(3)"><img src="posters/deti-peremen.jpg"><div class="title">Дети перемен</div></div>
+  <div class="card" onclick="playAd(4)"><img src="posters/slovo-pacana.jpg"><div class="title">Слово пацана</div></div>
+  <div class="card" onclick="playAd(5)"><img src="posters/obnalshik.jpg"><div class="title">Обнальщик</div></div>
 </div>
 
 <div id="playerModal">
-
-<div class="close" onclick="closePlayer()">×</div>
-
-<div id="videoContainer">
-
-<div id="adText">Просмотр начнется после рекламы</div>
-
-<video id="video" playsinline webkit-playsinline autoplay muted></video>
-
-<div id="adContainer"></div>
-
-<div id="adTimer"></div>
-
-<button id="skipAd" onclick="skipAd()">Пропустить</button>
-
-</div>
-
+  <div class="close" onclick="closePlayer()">×</div>
+  <div id="adText">Просмотр начнется после рекламы</div>
+  <div id="videoContainer">
+    <button id="soundBtn" onclick="toggleSound()">🔇 Включить звук</button>
+    <video id="video" playsinline muted></video>
+    <div id="adTimer"></div>
+    <button id="skipAd" onclick="skipAd()">Пропустить</button>
+  </div>
 </div>
 
 <script>
-
+const posters = document.querySelectorAll(".card")
+let currentPoster = 0
 let adCount = 0
-let maxAds = 3
-
+const maxAds = 3
 let video = document.getElementById("video")
+let timerInterval
 
-function playAd(){
-
-adCount = 0
-
-document.getElementById("playerModal").style.display="flex"
-
-startAd()
-
+function playAd(posterIndex){
+  currentPoster = posterIndex
+  adCount = 0
+  document.getElementById("playerModal").style.display = "flex"
+  video.muted = true
+  video.play().catch(()=>{})
+  startAd()
 }
 
 async function startAd(){
-
-let uid = localStorage.getItem("uid")
-
-if(!uid){
-
-uid = "uid"+Math.floor(Math.random()*999999999)
-
-localStorage.setItem("uid",uid)
-
-}
-
-let device = /Android|iPhone/i.test(navigator.userAgent) ? "mobile" : "desktop"
-
-let domain = window.location.hostname
-
-let vastUrl =
-"https://ssp.wink.ru/v1/rt/avod/vast?ad_place_type=preroll"
-+"&age_value=18"
-+"&broadcast_type=ott"
-+"&client_id="+uid
-+"&client_version="
-+"&domain="+domain
-+"&embedded=P5"
-+"&is_child=false"
-+"&is_paid=0"
-+"&location=100001"
-+"&san=web_vast_code"
-+"&ad_position=1"
-+"&content_id=23080"
-+"&device_type=NCWEB"
-+"&web_client_type="+device
-+"&cb="+Date.now()
-+"&rnd="+Math.floor(Math.random()*999999999)
-
-try{
-
-let response = await fetch(vastUrl)
-
-let xmlText = await response.text()
-
-let parser = new DOMParser()
-
-let xml = parser.parseFromString(xmlText,"text/xml")
-
-let mediaFile = xml.querySelector("MediaFile")
-
-if(!mediaFile){
-
-console.log("Нет MediaFile")
-
-closePlayer()
-
-return
-
-}
-
-let videoUrl = mediaFile.textContent.trim()
-
-video.src = videoUrl
-
-video.play()
-
-startTimer()
-
-}catch(e){
-
-console.log("VAST error",e)
-
-closePlayer()
-
-}
-
+  let uid = localStorage.getItem("uid")
+  if(!uid){
+    uid = "uid"+Math.floor(Math.random()*999999999)
+    localStorage.setItem("uid", uid)
+  }
+  let device = /Android|iPhone/i.test(navigator.userAgent) ? "mobile" : "desktop"
+  let domain = window.location.hostname
+  let vastUrl =
+    "https://ssp.wink.ru/v1/rt/avod/vast?ad_place_type=preroll"+
+    "&age_value=18"+
+    "&broadcast_type=ott"+
+    "&client_id="+uid+
+    "&client_version=&domain="+domain+
+    "&embedded=P5"+
+    "&is_child=false&is_paid=0"+
+    "&location=100001"+
+    "&san=web_vast_code"+
+    "&ad_position=1"+
+    "&content_id=23080"+
+    "&device_type=NCWEB"+
+    "&web_client_type="+device+
+    "&cb="+Date.now()+
+    "&rnd="+Math.floor(Math.random()*1000000000)
+  try{
+    let resp = await fetch(vastUrl)
+    let text = await resp.text()
+    let parser = new DOMParser()
+    let xml = parser.parseFromString(text,"text/xml")
+    let mediaFile = xml.querySelector("MediaFile")
+    if(!mediaFile){
+      console.log("Нет MediaFile в VAST")
+      return
+    }
+    video.src = mediaFile.textContent.trim()
+    video.play().catch(()=>{})
+    startTimer()
+  }catch(e){
+    console.log("Ошибка VAST:", e)
+    closePlayer()
+  }
 }
 
 function startTimer(){
-
-let timer = document.getElementById("adTimer")
-
-document.getElementById("skipAd").style.display="block"
-
-let interval = setInterval(()=>{
-
-if(video.duration){
-
-let remaining = Math.round(video.duration - video.currentTime)
-
-timer.innerText = "Реклама: "+remaining+" сек"
-
-}
-
-},500)
-
-video.onended = ()=>{
-
-clearInterval(interval)
-
-adCount++
-
-if(adCount < maxAds){
-
-startAd()
-
-}else{
-
-closePlayer()
-
-}
-
-}
-
+  const timer = document.getElementById("adTimer")
+  document.getElementById("skipAd").style.display = "block"
+  clearInterval(timerInterval)
+  timerInterval = setInterval(()=>{
+    if(video.duration){
+      timer.innerText = "Реклама: "+Math.round(video.duration - video.currentTime)+" сек"
+    }
+  },500)
+  video.onended = ()=>{
+    clearInterval(timerInterval)
+    adCount++
+    if(adCount < maxAds){
+      startAd()
+    }else{
+      nextPoster()
+    }
+  }
 }
 
 function skipAd(){
-
-video.pause()
-
-adCount++
-
-if(adCount < maxAds){
-
-startAd()
-
-}else{
-
-closePlayer()
-
+  video.pause()
+  adCount++
+  if(adCount < maxAds){
+    startAd()
+  }else{
+    nextPoster()
+  }
 }
 
+function toggleSound(){
+  video.muted = !video.muted
+  document.getElementById("soundBtn").innerText = video.muted ? "🔇 Включить звук" : "🔊 Выключить звук"
 }
 
 function closePlayer(){
-
-document.getElementById("playerModal").style.display="none"
-
-video.pause()
-
-video.src=""
-
+  document.getElementById("playerModal").style.display = "none"
+  video.pause()
+  video.src = ""
+  document.getElementById("skipAd").style.display = "none"
+  document.getElementById("adTimer").innerText = ""
 }
 
+function nextPoster(){
+  closePlayer()
+  currentPoster++
+  if(currentPoster >= posters.length) currentPoster=0
+  playAd(currentPoster)
+}
 </script>
 
 </body>
-
 </html>
