@@ -56,11 +56,20 @@ video{
 
 <body>
 
-<div id="status">loading ad...</div>
-<div id="closeBtn">✕</div>
-<div id="skipBtn">Skip</div>
+<div id="playerWrapper">
 
-<video id="video" playsinline></video>
+  <div id="status">loading ad...</div>
+
+  <!-- крестик закрытия -->
+  <div id="closeBtn">✕</div>
+
+  <!-- кнопка пропустить -->
+  <div id="skipBtn">Skip</div>
+
+  <!-- видео плеер -->
+  <video id="video" playsinline></video>
+
+</div>
 
 <script>
 const video = document.getElementById("video");
