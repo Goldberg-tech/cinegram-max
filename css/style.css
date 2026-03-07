@@ -7,6 +7,7 @@ font-family:Arial;
 
 }
 
+/* ===== HERO ===== */
 
 .hero{
 
@@ -16,7 +17,6 @@ overflow:hidden;
 
 }
 
-
 .hero img{
 
 width:100%;
@@ -25,7 +25,6 @@ object-fit:cover;
 cursor:pointer;
 
 }
-
 
 .hero-gradient{
 
@@ -37,6 +36,7 @@ background:linear-gradient(transparent,#000);
 
 }
 
+/* ===== CONTENT ===== */
 
 .content{
 
@@ -44,14 +44,12 @@ padding:10px;
 
 }
 
-
 h2{
 
 margin:25px 10px 10px;
 font-size:22px;
 
 }
-
 
 .row{
 
@@ -62,7 +60,6 @@ padding:10px;
 
 }
 
-
 .poster{
 
 min-width:140px;
@@ -70,7 +67,6 @@ transition:0.25s;
 cursor:pointer;
 
 }
-
 
 .poster img{
 
@@ -81,13 +77,11 @@ border-radius:10px;
 
 }
 
-
 .poster:hover{
 
 transform:scale(1.08);
 
 }
-
 
 .row::-webkit-scrollbar{
 
@@ -95,49 +89,61 @@ display:none;
 
 }
 
+/* ===== PLAYER ===== */
+
 #playerWrapper{
-  position:relative;
-  display:flex;
-  justify-content:center;
-  align-items:center;
+    position:relative;
+    width:720px;
+    max-width:100vw;
+    margin:auto;
+    display:flex;
+    justify-content:center;
+    align-items:center;
 }
 
 #playerWrapper video{
-  width:720px;
-  max-width:100vw;
-  background:#000;
+    width:100%;
+    height:auto;
+    background:#000;
+    display:block;
 }
+
+/* крестик */
 
 #closeBtn{
-  position:absolute;
-  top:15px;
-  right:20px;
-  font-size:26px;
-  cursor:pointer;
-  color:white;
-  z-index:999;
-  line-height:1;
+    position:absolute;
+    top:12px;
+    right:16px;
+    font-size:28px;
+    cursor:pointer;
+    color:white;
+    z-index:1000;
+    line-height:1;
 }
+
+/* skip */
 
 #skipBtn{
-  position:absolute;
-  bottom:25px;
-  right:25px;
-  padding:10px 18px;
-  background:rgba(255,255,255,0.18);
-  color:white;
-  border-radius:8px;
-  cursor:pointer;
-  display:none;
-  z-index:999;
-  backdrop-filter: blur(4px);
+    position:absolute;
+    bottom:22px;
+    right:22px;
+    padding:10px 18px;
+    background:rgba(255,255,255,0.2);
+    color:white;
+    border-radius:8px;
+    cursor:pointer;
+    display:none;
+    z-index:1000;
+    backdrop-filter: blur(6px);
 }
 
+/* статус */
+
 #status{
-  position:absolute;
-  top:10px;
-  left:10px;
-  color:#fff;
-  font-size:14px;
-  z-index:998;
+    position:absolute;
+    top:8px;
+    left:10px;
+    color:white;
+    font-size:14px;
+    z-index:999;
 }
