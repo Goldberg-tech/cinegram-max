@@ -2,88 +2,306 @@
 <html>
 <head>
 <meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
 <title>VAST Player</title>
-
 <style>
 
-body{
-  background:#000;
-  margin:0;
-  display:flex;
-  justify-content:center;
-  align-items:center;
-  height:100vh;
-  overflow:hidden;
-  font-family:Arial;
+* { box-sizing: border-box; margin: 0; padding: 0; }
+
+body {
+  background: #000;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  height: 100vh;
+  overflow: hidden;
+  font-family: Arial, sans-serif;
 }
 
-/* PLAYER WRAPPER */
-
-#playerWrapper{
-  position:relative;
-  width:720px;
-  max-width:100vw;
-  margin:auto;
+#playerWrapper {
+  position: relative;
+  width: 100vw;
+  height: 100vh;
+  background: #000;
 }
 
-/* VIDEO */
-
-#playerWrapper video{
-  width:100%;
-  background:#000;
-  display:block;
+video {
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+  display: block;
+  background: #000;
 }
 
 /* STATUS */
-
-#status{
-  position:absolute;
-  top:10px;
-  left:10px;
-  color:#fff;
-  font-size:14px;
-  z-index:1000;
+#status {
+  position: absolute;
+  top: 12px;
+  left: 14px;
+  color: rgba(255,255,255,0.75);
+  font-size: 13px;
+  z-index: 1000;
+  background: rgba(0,0,0,0.4);
+  padding: 4px 10px;
+  border-radius: 20px;
+  backdrop-filter: blur(4px);
 }
+
+/* DEBUG INFO */
+#debugInfo {
+  position: absolute;
+  top: 44px;
+  left: 14px;
+  color: rgba(255,255,255,0.5);
+  font-size: 11px;
+  z-index: 1000;
+  background: rgba(0,0,0,0.3);
+  padding: 3px 8px;
+  border-radius: 10px;
+  opacity: 0;
+  transition: opacity 0.4s;
+}
+#debugInfo.visible { opacity: 1; }
 
 /* CLOSE BUTTON */
-
-#closeBtn{
-  position:absolute;
-  top:12px;
-  right:16px;
-  color:#fff;
-  font-size:28px;
-  cursor:pointer;
-  z-index:1001;
+#closeBtn {
+  position: absolute;
+  top: 10px;
+  right: 14px;
+  color: rgba(255,255,255,0.85);
+  font-size: 26px;
+  cursor: pointer;
+  z-index: 1001;
+  width: 36px;
+  height: 36px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(0,0,0,0.35);
+  border-radius: 50%;
+  backdrop-filter: blur(4px);
 }
+
+/* MUTE BUTTON */
+#muteBtn {
+  position: absolute;
+  top: 10px;
+  right: 58px;
+  color: rgba(255,255,255,0.85);
+  font-size: 18px;
+  cursor: pointer;
+  z-index: 1001;
+  width: 36px;
+  height: 36px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(0,0,0,0.35);
+  border-radius: 50%;
+  backdrop-filter: blur(4px);
+  border: 1px solid rgba(255,255,255,0.15);
+  transition: background 0.2s;
+  user-select: none;
+}
+#muteBtn:hover { background: rgba(255,255,255,0.15); }
+#muteBtn.muted { border-color: rgba(255,100,100,0.5); }
 
 /* SKIP BUTTON */
-
-#skipBtn{
-  position:absolute;
-  bottom:22px;
-  right:22px;
-  padding:10px 18px;
-  background:rgba(255,255,255,0.2);
-  color:white;
-  border-radius:8px;
-  cursor:pointer;
-  display:none;
-  z-index:1001;
+#skipBtn {
+  position: absolute;
+  bottom: 24px;
+  right: 20px;
+  padding: 10px 20px;
+  background: rgba(255,255,255,0.18);
+  color: white;
+  border-radius: 8px;
+  cursor: pointer;
+  display: none;
+  z-index: 1001;
   backdrop-filter: blur(6px);
+  border: 1px solid rgba(255,255,255,0.25);
+  font-size: 15px;
 }
+
+/* LOG BUTTON */
+#logBtn {
+  position: absolute;
+  bottom: 24px;
+  left: 20px;
+  width: 36px;
+  height: 36px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(0,0,0,0.45);
+  color: rgba(255,255,255,0.7);
+  font-size: 16px;
+  border-radius: 50%;
+  cursor: pointer;
+  z-index: 1001;
+  backdrop-filter: blur(4px);
+  border: 1px solid rgba(255,255,255,0.15);
+  user-select: none;
+}
+
+#logCounter {
+  position: absolute;
+  top: -4px;
+  right: -4px;
+  background: #e55;
+  color: white;
+  font-size: 9px;
+  border-radius: 8px;
+  padding: 1px 4px;
+  display: none;
+  line-height: 1.4;
+  pointer-events: none;
+  min-width: 14px;
+  text-align: center;
+}
+
+/* LOG PANEL */
+#logPanel {
+  position: absolute;
+  inset: 0;
+  background: rgba(0,0,0,0.95);
+  z-index: 2000;
+  display: flex;
+  flex-direction: column;
+  transform: translateY(100%);
+  transition: transform 0.3s ease;
+}
+#logPanel.open { transform: translateY(0); }
+
+#logHeader {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 14px 16px 10px;
+  border-bottom: 1px solid rgba(255,255,255,0.1);
+  flex-shrink: 0;
+}
+#logTitle { color: rgba(255,255,255,0.9); font-size: 14px; font-weight: bold; }
+#logControls { display: flex; gap: 10px; align-items: center; }
+#logDownload {
+  color: rgba(100,210,140,0.8);
+  font-size: 12px;
+  cursor: pointer;
+  padding: 3px 10px;
+  border: 1px solid rgba(100,210,140,0.3);
+  border-radius: 10px;
+}
+#logClear {
+  color: rgba(255,100,100,0.8);
+  font-size: 12px;
+  cursor: pointer;
+  padding: 3px 10px;
+  border: 1px solid rgba(255,100,100,0.3);
+  border-radius: 10px;
+}
+#logClose { color: rgba(255,255,255,0.6); font-size: 22px; cursor: pointer; line-height: 1; }
+
+/* Sheets sync indicator */
+#sheetsStatus {
+  font-size: 10px;
+  padding: 2px 8px;
+  border-radius: 10px;
+  background: rgba(255,255,255,0.07);
+  color: rgba(255,255,255,0.4);
+  white-space: nowrap;
+}
+#sheetsStatus.ok     { color: rgba(100,220,130,0.8); }
+#sheetsStatus.error  { color: rgba(255,100,100,0.8); }
+#sheetsStatus.sending { color: rgba(255,210,80,0.8); }
+
+#logBody {
+  flex: 1;
+  overflow-y: auto;
+  padding: 4px 0;
+  font-family: 'Courier New', monospace;
+  font-size: 11px;
+}
+
+.log-entry {
+  display: flex;
+  gap: 8px;
+  padding: 5px 14px;
+  border-bottom: 1px solid rgba(255,255,255,0.04);
+  word-break: break-all;
+  line-height: 1.5;
+}
+.log-entry:last-child { border-bottom: none; }
+.log-time { color: rgba(255,255,255,0.28); flex-shrink: 0; font-size: 10px; padding-top: 2px; min-width: 60px; }
+.log-msg  { flex: 1; }
+.log-info  { color: rgba(160,210,255,0.9); }
+.log-ok    { color: rgba(100,220,130,0.9); }
+.log-warn  { color: rgba(255,210,80,0.9); }
+.log-error { color: rgba(255,100,100,0.95); font-weight: bold; }
+.log-debug { color: rgba(170,170,170,0.6); }
+.log-vast  { color: rgba(190,150,255,0.9); }
+.log-pool  { color: rgba(255,180,80,0.85); }
+
+/* LOADER */
+#loader {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  background: #000;
+  z-index: 500;
+  transition: opacity 0.4s;
+}
+#loader.hidden { opacity: 0; pointer-events: none; }
+
+.spinner {
+  width: 40px;
+  height: 40px;
+  border: 3px solid rgba(255,255,255,0.15);
+  border-top-color: rgba(255,255,255,0.7);
+  border-radius: 50%;
+  animation: spin 0.8s linear infinite;
+  margin-bottom: 14px;
+}
+@keyframes spin { to { transform: rotate(360deg); } }
+#loader p { color: rgba(255,255,255,0.5); font-size: 13px; }
 
 </style>
 </head>
-
 <body>
 
 <div id="playerWrapper">
 
-  <div id="status">loading ad...</div>
+  <div id="loader">
+    <div class="spinner"></div>
+    <p>Загрузка рекламы...</p>
+  </div>
 
+  <div id="status">инициализация...</div>
+  <div id="debugInfo"></div>
+
+  <div id="muteBtn" title="Вкл/выкл звук">🔊</div>
   <div id="closeBtn">✕</div>
-  <div id="skipBtn">Skip</div>
+  <div id="skipBtn">Пропустить →</div>
+
+  <div id="logBtn" title="Открыть логи">
+    ☰
+    <span id="logCounter"></span>
+  </div>
+
+  <div id="logPanel">
+    <div id="logHeader">
+      <div id="logTitle">📋 Лог событий</div>
+      <div id="logControls">
+        <div id="sheetsStatus">● sheets</div>
+        <div id="logDownload">скачать</div>
+        <div id="logClear">очистить</div>
+        <div id="logClose">✕</div>
+      </div>
+    </div>
+    <div id="logBody"></div>
+  </div>
 
   <video id="video" playsinline></video>
 
@@ -91,190 +309,528 @@ body{
 
 <script>
 
-const video = document.getElementById("video");
-const status = document.getElementById("status");
-const closeBtn = document.getElementById("closeBtn");
-const skipBtn = document.getElementById("skipBtn");
+/* ============================================================
+   КОНФИГ
+   ============================================================ */
 
-/* ===== DEVICE ID ===== */
+const CONFIG = {
+  adsPerDevice:   3,
+  poolSize:       50,
+  cooldownMs:     30 * 60 * 1000,
+  skipDelaySec:   5,
+  fetchTimeoutMs: 8000,
+  maxRetries:     3,
+  retryDelayMs:   1500,
+  noAdRetryMs:    2000,
+  sheetsUrl:      "https://script.google.com/macros/s/AKfycbwmRLicIgCvj6RSYLqbFuxqkcNHqvDvPgTpeFQw-60X_O9-wVy9z5TWZo5iIEfQp4GAVQ/exec",
+  sheetsEnabled:  true,
+  sheetsTypes:    ["info", "ok", "warn", "error", "pool"],
+};
 
-function getDevice(){
+/* ============================================================
+   ЭЛЕМЕНТЫ
+   ============================================================ */
 
-  let id = localStorage.getItem("device_id");
+const video        = document.getElementById("video");
+const statusEl     = document.getElementById("status");
+const debugInfo    = document.getElementById("debugInfo");
+const closeBtn     = document.getElementById("closeBtn");
+const muteBtn      = document.getElementById("muteBtn");
+const skipBtn      = document.getElementById("skipBtn");
+const loader       = document.getElementById("loader");
+const logBtn       = document.getElementById("logBtn");
+const logPanel     = document.getElementById("logPanel");
+const logBody      = document.getElementById("logBody");
+const logClear     = document.getElementById("logClear");
+const logClose     = document.getElementById("logClose");
+const logDownload  = document.getElementById("logDownload");
+const logCounter   = document.getElementById("logCounter");
+const sheetsStatus = document.getElementById("sheetsStatus");
 
-  if(!id){
-    id = "dev_"+Math.random().toString(36).slice(2);
-    localStorage.setItem("device_id",id);
-  }
+/* ============================================================
+   GOOGLE SHEETS
+   ============================================================ */
 
-  return id;
+let sheetsQueue   = [];
+let sheetsSending = false;
+
+function sheetsSetStatus(state) {
+  sheetsStatus.className = state;
+  const labels = { ok: "● sheets ✓", error: "● sheets ✗", sending: "● sheets …" };
+  sheetsStatus.textContent = labels[state] || "● sheets";
 }
 
-/* HASH */
+async function sheetsSend(entry) {
+  if (!CONFIG.sheetsEnabled) return;
+  if (!CONFIG.sheetsTypes.includes(entry.type)) return;
+  sheetsQueue.push(entry);
+  if (!sheetsSending) sheetsFlush();
+}
 
-function hashCode(str){
+async function sheetsFlush() {
+  if (sheetsQueue.length === 0) { sheetsSending = false; return; }
+  sheetsSending = true;
+  sheetsSetStatus("sending");
+  const entry = sheetsQueue[0];
+  try {
+    await fetch(CONFIG.sheetsUrl, {
+      method: "POST",
+      mode: "no-cors",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(entry)
+    });
+    sheetsQueue.shift();
+    sheetsSetStatus("ok");
+  } catch(e) {
+    sheetsQueue.shift();
+    sheetsSetStatus("error");
+  }
+  setTimeout(sheetsFlush, 300);
+}
+
+/* ============================================================
+   ЛОГГЕР
+   ============================================================ */
+
+let errorCount       = 0;
+let logPanelOpen     = false;
+let allLogs          = [];
+let currentSessionId = 0;
+let currentDeviceId  = "";
+
+function ts() {
+  const d = new Date();
+  return d.toTimeString().slice(0,8) + '.' + String(d.getMilliseconds()).padStart(3,'0');
+}
+
+function log(msg, type = 'info') {
+  const time = ts();
+
+  const entry = document.createElement('div');
+  entry.className = 'log-entry';
+  entry.innerHTML = `<span class="log-time">${time}</span><span class="log-msg log-${type}">${msg}</span>`;
+  logBody.appendChild(entry);
+  logBody.scrollTop = logBody.scrollHeight;
+
+  const record = { time, type, msg, session: currentSessionId, device: currentDeviceId ? '...'+currentDeviceId.slice(-6) : '', index: globalPlayIndex };
+  allLogs.push(record);
+  sheetsSend(record);
+
+  if ((type === 'error' || type === 'warn') && !logPanelOpen) {
+    errorCount++;
+    logCounter.style.display = 'block';
+    logCounter.textContent = errorCount > 99 ? '99+' : errorCount;
+  }
+
+  while (logBody.children.length > 300) logBody.removeChild(logBody.firstChild);
+}
+
+const _origError = console.error;
+console.error = (...args) => {
+  log('CONSOLE: ' + args.join(' '), 'error');
+  _origError.apply(console, args);
+};
+
+window.addEventListener('error', e => {
+  log(`JS ERROR: ${e.message} (${e.filename}:${e.lineno})`, 'error');
+});
+
+window.addEventListener('unhandledrejection', e => {
+  log(`UNHANDLED PROMISE: ${e.reason}`, 'error');
+});
+
+/* ============================================================
+   УПРАВЛЕНИЕ ПАНЕЛЬЮ ЛОГОВ
+   ============================================================ */
+
+logBtn.onclick = () => {
+  logPanelOpen = true;
+  logPanel.classList.add('open');
+  errorCount = 0;
+  logCounter.style.display = 'none';
+};
+
+logClose.onclick = () => {
+  logPanelOpen = false;
+  logPanel.classList.remove('open');
+};
+
+logClear.onclick = () => {
+  logBody.innerHTML = '';
+  allLogs = [];
+  errorCount = 0;
+  logCounter.style.display = 'none';
+  log('Лог очищен', 'debug');
+};
+
+logDownload.onclick = () => {
+  const lines = allLogs.map(r =>
+    `[${r.time}] [${r.type.toUpperCase().padEnd(5)}] [s#${r.session}] [${r.device}] [i=${r.index}] ${r.msg}`
+  ).join('\n');
+  const blob = new Blob([lines], { type: 'text/plain' });
+  const url  = URL.createObjectURL(blob);
+  const a    = document.createElement('a');
+  a.href     = url;
+  a.download = `vast-log-${new Date().toISOString().slice(0,19).replace(/:/g,'-')}.txt`;
+  a.click();
+  URL.revokeObjectURL(url);
+  log('Лог скачан', 'ok');
+};
+
+/* ============================================================
+   КНОПКА ЗВУКА
+   ============================================================ */
+
+let isMuted = false;
+
+muteBtn.onclick = () => {
+  isMuted = !isMuted;
+  video.muted = isMuted;
+  muteBtn.textContent = isMuted ? '🔇' : '🔊';
+  muteBtn.classList.toggle('muted', isMuted);
+  log(`Звук: ${isMuted ? 'выключен' : 'включён'}`, 'info');
+};
+
+/* ============================================================
+   DEVICE ID POOL
+   ============================================================ */
+
+function loadPool() {
+  try { return JSON.parse(localStorage.getItem("vastPool") || "[]"); }
+  catch(e) { return []; }
+}
+
+function savePool(pool) {
+  localStorage.setItem("vastPool", JSON.stringify(pool));
+}
+
+function generateId() {
+  return "dev_" + Math.random().toString(36).slice(2) + Math.random().toString(36).slice(2);
+}
+
+function getActiveDevice() {
+  let pool = loadPool();
+  const now = Date.now();
+
+  if (pool.length > CONFIG.poolSize * 2) pool = pool.slice(-CONFIG.poolSize * 2);
+
+  let device = pool.find(d => d.plays < CONFIG.adsPerDevice && now >= (d.cooldownUntil || 0));
+
+  if (!device) {
+    let expired = pool.find(d => now >= (d.cooldownUntil || 0));
+    if (expired) {
+      log(`Pool: сброс cooldown для ...${expired.id.slice(-6)}`, 'pool');
+      expired.plays = 0;
+      expired.cooldownUntil = 0;
+      device = expired;
+    } else {
+      device = { id: generateId(), plays: 0, cooldownUntil: 0 };
+      pool.push(device);
+      if (pool.length > CONFIG.poolSize * 2) pool.shift();
+      log(`Pool: создан новый ID ...${device.id.slice(-6)} (всего: ${pool.length})`, 'pool');
+    }
+  }
+
+  savePool(pool);
+  return device;
+}
+
+function recordPlay(deviceId) {
+  const pool = loadPool();
+  const now  = Date.now();
+  const device = pool.find(d => d.id === deviceId);
+  if (device) {
+    device.plays = (device.plays || 0) + 1;
+    if (device.plays >= CONFIG.adsPerDevice) {
+      device.cooldownUntil = now + CONFIG.cooldownMs;
+      device.plays = 0;
+      log(`Pool: ID ...${deviceId.slice(-6)} → cooldown ${Math.round(CONFIG.cooldownMs/60000)}мин`, 'pool');
+    } else {
+      log(`Pool: ID ...${deviceId.slice(-6)} показов: ${device.plays}/${CONFIG.adsPerDevice}`, 'pool');
+    }
+    savePool(pool);
+  }
+}
+
+/* ============================================================
+   УТИЛИТЫ
+   ============================================================ */
+
+function hashCode(str) {
   let hash = 0;
-  for(let i=0;i<str.length;i++){
-    hash = (hash<<5)-hash + str.charCodeAt(i);
+  for (let i = 0; i < str.length; i++) {
+    hash = (hash << 5) - hash + str.charCodeAt(i);
     hash |= 0;
   }
   return Math.abs(hash);
 }
 
-/* PLAYBACK STATE */
+function setStatus(text) { statusEl.innerText = text; }
 
-let playCounter = 0;
-
-/* VAST URL */
-
-function buildVastUrl(){
-
-  const device = getDevice();
-
-  const groupSize = 3;
-  const deviceGroup = hashCode(device) % groupSize;
-
-  const segment = Math.floor(playCounter / groupSize);
-
-  const shuffle = Math.random() > 0.7 ? 1 : 0;
-
-  const cb = Date.now() + Math.floor(Math.random()*999999);
-
-  return `https://ssp.wink.ru/v1/rt/avod/vast?ad_place_type=preroll&age_value=18&broadcast_type=ott&client_id=${device}&domain=t.me&embedded=P5&is_child=false&is_paid=0&location=100001&san=web_vast_code&ad_position=1&content_id=23080&device_type=NCWEB&web_client_type=mobile&segment=${segment}&group=${deviceGroup}&shuffle=${shuffle}&play_index=${playCounter}&cb=${cb}`;
+function showDebug(text, ms = 3000) {
+  debugInfo.innerText = text;
+  debugInfo.classList.add("visible");
+  setTimeout(() => debugInfo.classList.remove("visible"), ms);
 }
 
-/* FETCH */
-
-async function fetchText(url){
-  return await (await fetch(url)).text();
+function showLoader(show) {
+  show ? loader.classList.remove("hidden") : loader.classList.add("hidden");
 }
 
-/* WRAPPER RESOLVE */
+/* ============================================================
+   VAST
+   ============================================================ */
 
-async function resolveVast(url){
+function buildVastUrl(deviceId, playIndex) {
+  const groupSize   = 3;
+  const deviceGroup = hashCode(deviceId) % groupSize;
+  const segment     = Math.floor(playIndex / groupSize);
+  const shuffle     = Math.random() > 0.7 ? 1 : 0;
+  const cb          = Date.now() + Math.floor(Math.random() * 999999);
+  return `https://ssp.wink.ru/v1/rt/avod/vast?ad_place_type=preroll&age_value=18&broadcast_type=ott&client_id=${deviceId}&domain=t.me&embedded=P5&is_child=false&is_paid=0&location=100001&san=web_vast_code&ad_position=1&content_id=23080&device_type=NCWEB&web_client_type=mobile&segment=${segment}&group=${deviceGroup}&shuffle=${shuffle}&play_index=${playIndex}&cb=${cb}`;
+}
 
-  let xml = await fetchText(url);
-
-  let wrapper = xml.match(/<VASTAdTagURI><!\[CDATA\[(.*?)\]\]>/);
-
-  if(wrapper){
-    return resolveVast(wrapper[1].trim());
+async function fetchWithTimeout(url, timeoutMs) {
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), timeoutMs);
+  try {
+    const res = await fetch(url, { signal: controller.signal });
+    clearTimeout(timer);
+    return await res.text();
+  } catch(e) {
+    clearTimeout(timer);
+    throw e;
   }
+}
 
+async function resolveVast(url, depth = 0) {
+  if (depth > 5) throw new Error("VAST wrapper depth exceeded");
+  log(`VAST fetch [depth=${depth}]: ${url.slice(0,80)}...`, 'vast');
+  const xml = await fetchWithTimeout(url, CONFIG.fetchTimeoutMs);
+  log(`VAST ответ: ${xml.length} байт`, 'vast');
+  const wrapper = xml.match(/<VASTAdTagURI><!\[CDATA\[([\s\S]*?)\]\]>/);
+  if (wrapper) {
+    log(`VAST wrapper → следуем по цепочке`, 'vast');
+    return resolveVast(wrapper[1].trim(), depth + 1);
+  }
+  const hasMedia = xml.includes('MediaFile') || xml.includes('.mp4');
+  log(`VAST разобран. MediaFile: ${hasMedia ? 'найден ✓' : 'НЕ найден ✗'}`, hasMedia ? 'vast' : 'warn');
   return xml;
 }
 
-/* MEDIA EXTRACT */
-
-function extractMedia(xml){
-
-  try{
-    let doc = new DOMParser().parseFromString(xml,"text/xml");
-    let media = doc.querySelector("MediaFile");
-    if(media) return media.textContent.trim();
-  }catch(e){}
-
-  let match = xml.match(/https:\/\/[^ ]+\.mp4/);
-
-  return match ? match[0] : null;
+function extractMedia(xml) {
+  try {
+    const doc   = new DOMParser().parseFromString(xml, "text/xml");
+    const media = doc.querySelector("MediaFile");
+    if (media) {
+      const url = media.textContent.trim();
+      log(`Media URL: ${url.slice(0,70)}...`, 'ok');
+      return url;
+    }
+  } catch(e) {
+    log(`Ошибка парсинга XML: ${e.message}`, 'warn');
+  }
+  const match = xml.match(/https?:\/\/[^\s"<>]+\.mp4/i);
+  if (match) {
+    log(`Media URL (regex): ${match[0].slice(0,70)}...`, 'ok');
+    return match[0];
+  }
+  return null;
 }
 
-/* SKIP */
+/* ============================================================
+   SKIP
+   ============================================================ */
 
-let skipTimer;
+let skipTimer = null;
 
-function startSkipCountdown(){
-
-  skipBtn.style.display="none";
-
-  if(skipTimer) clearTimeout(skipTimer);
-
-  skipTimer = setTimeout(()=>{
-    skipBtn.style.display="block";
-  },5000);
+function resetSkip() {
+  skipBtn.style.display = "none";
+  if (skipTimer) clearTimeout(skipTimer);
 }
 
-/* PLAYER */
+function startSkipCountdown() {
+  resetSkip();
+  skipTimer = setTimeout(() => {
+    skipBtn.style.display = "block";
+    log('Кнопка пропуска показана', 'debug');
+  }, CONFIG.skipDelaySec * 1000);
+}
 
-async function startAd(){
+/* ============================================================
+   ГЛОБАЛЬНЫЙ СЧЁТЧИК
+   ============================================================ */
 
-  try{
+let globalPlayIndex = parseInt(localStorage.getItem("vastGlobalIndex") || "0");
 
-    status.innerText="requesting ad...";
+function bumpGlobalIndex() {
+  globalPlayIndex++;
+  localStorage.setItem("vastGlobalIndex", globalPlayIndex);
+}
 
-    const vastUrl = buildVastUrl();
+/* ============================================================
+   ОСНОВНОЙ ЦИКЛ
+   ============================================================ */
 
-    let xml = await resolveVast(vastUrl);
+let currentSession = 0;
 
-    const media = extractMedia(xml);
+async function startAd() {
+  const mySession  = ++currentSession;
+  currentSessionId = mySession;
 
-    if(!media){
+  log(`=== Сессия #${mySession} | globalIndex=${globalPlayIndex} ===`, 'info');
 
-      status.innerText="no ad";
+  resetSkip();
+  showLoader(true);
+  video.pause();
+  video.removeAttribute("src");
+  video.load();
 
-      setTimeout(()=>{
-        playCounter++;
-        startAd();
-      },2000);
+  const device    = getActiveDevice();
+  currentDeviceId = device.id;
 
+  setStatus("запрос рекламы...");
+  showDebug(`device: ...${device.id.slice(-6)} | play #${globalPlayIndex}`);
+  log(`Device: ...${device.id.slice(-6)}, plays=${device.plays}`, 'info');
+
+  for (let attempt = 1; attempt <= CONFIG.maxRetries; attempt++) {
+    if (mySession !== currentSession) {
+      log(`Сессия #${mySession} отменена`, 'debug');
       return;
     }
 
-    status.innerText="playing ad";
+    log(`Попытка ${attempt}/${CONFIG.maxRetries}`, 'info');
 
-    video.src = media;
-    await video.play();
+    try {
+      const vastUrl = buildVastUrl(device.id, globalPlayIndex);
+      const xml     = await resolveVast(vastUrl);
 
-    startSkipCountdown();
+      if (mySession !== currentSession) return;
 
-    playCounter++;
+      const mediaUrl = extractMedia(xml);
 
-  }catch(e){
+      if (!mediaUrl) {
+        log(`Попытка ${attempt}: нет медиа, пауза ${CONFIG.noAdRetryMs}мс`, 'warn');
+        setStatus("нет рекламы, повтор...");
+        await delay(CONFIG.noAdRetryMs);
+        continue;
+      }
 
-    console.error(e);
+      setStatus("загрузка видео...");
+      log(`Загрузка видео...`, 'info');
+      video.src = mediaUrl;
+      video.load();
+      video.muted = isMuted;
 
-    status.innerText="error";
+      await new Promise((resolve, reject) => {
+        const onReady = () => { cleanup(); log('canplay — видео готово', 'ok'); resolve(); };
+        const onError = () => { cleanup(); reject(new Error(`video error code=${video.error?.code} msg=${video.error?.message}`)); };
+        const onAbort = () => { cleanup(); reject(new Error("video aborted")); };
+        const timer   = setTimeout(() => { cleanup(); reject(new Error("video load timeout 10s")); }, 10000);
+        const cleanup = () => {
+          clearTimeout(timer);
+          video.removeEventListener("canplay", onReady);
+          video.removeEventListener("error",   onError);
+          video.removeEventListener("abort",   onAbort);
+        };
+        video.addEventListener("canplay", onReady);
+        video.addEventListener("error",   onError);
+        video.addEventListener("abort",   onAbort);
+      });
 
-    setTimeout(startAd,3000);
+      if (mySession !== currentSession) return;
+
+      showLoader(false);
+      setStatus("▶ воспроизведение");
+
+      try {
+        await video.play();
+        log('play() успешно', 'ok');
+      } catch(playErr) {
+        log(`play() заблокирован (${playErr.message}), пробуем muted`, 'warn');
+        video.muted = true;
+        isMuted = true;
+        muteBtn.textContent = '🔇';
+        muteBtn.classList.add('muted');
+        await video.play();
+        log('play() в muted режиме — ок', 'ok');
+      }
+
+      startSkipCountdown();
+      recordPlay(device.id);
+      bumpGlobalIndex();
+      log(`Ролик запущен ✓ globalIndex → ${globalPlayIndex}`, 'ok');
+      return;
+
+    } catch(e) {
+      if (mySession !== currentSession) return;
+      const msg = e.name === "AbortError" ? "таймаут запроса" : e.message;
+      log(`ОШИБКА попытки ${attempt}: ${msg}`, 'error');
+      setStatus(`ошибка, повтор ${attempt}/${CONFIG.maxRetries}...`);
+      showDebug(`ошибка: ${msg}`);
+      await delay(CONFIG.retryDelayMs * attempt);
+    }
   }
+
+  if (mySession !== currentSession) return;
+  log(`Все ${CONFIG.maxRetries} попытки провалились → пауза 3с`, 'error');
+  showLoader(false);
+  setStatus("ошибка загрузки, следующий...");
+  await delay(3000);
+  startAd();
 }
 
-/* EVENTS */
+function delay(ms) {
+  return new Promise(resolve => setTimeout(resolve, ms));
+}
 
-video.addEventListener("ended",()=>{
-  status.innerText="ad finished";
+/* ============================================================
+   СОБЫТИЯ ВИДЕО
+   ============================================================ */
+
+video.addEventListener("ended", () => {
+  log('Видео завершено (ended)', 'ok');
+  setStatus("ролик завершён");
+  resetSkip();
   startAd();
 });
 
-/* Skip */
+video.addEventListener("error", () => {
+  if (!video.src || video.src === window.location.href) return;
+  log(`video.error: code=${video.error?.code}`, 'warn');
+});
 
-skipBtn.onclick=()=>{
-  video.pause();
+video.addEventListener("waiting",  () => log('Буферизация (waiting)...', 'debug'));
+video.addEventListener("stalled",  () => log('Зависание потока (stalled)', 'warn'));
+video.addEventListener("playing",  () => log('Воспроизведение (playing)', 'debug'));
+
+skipBtn.onclick = () => {
+  log('Пользователь: Skip', 'info');
+  resetSkip();
   startAd();
 };
 
-/* Close → Telegram WebApp safe exit */
-
-closeBtn.onclick=()=>{
-
+closeBtn.onclick = () => {
+  log('Закрытие плеера', 'info');
   video.pause();
-
-  if(document.fullscreenElement){
-    document.exitFullscreen();
-  }
-
-  if(window.Telegram?.WebApp){
+  if (window.Telegram?.WebApp) {
     window.Telegram.WebApp.close();
-  }else{
-    window.location.href="index.html";
+  } else {
+    window.location.href = "index.html";
   }
 };
 
-/* AUTO START */
+/* ============================================================
+   СТАРТ
+   ============================================================ */
+
+log('Плеер запущен', 'ok');
+log(`Config: adsPerDevice=${CONFIG.adsPerDevice}, cooldown=${CONFIG.cooldownMs/60000}мин, poolSize=${CONFIG.poolSize}`, 'debug');
+log(`Sheets: ${CONFIG.sheetsEnabled ? 'включён ✓' : 'выключен'}`, 'info');
+log(`globalPlayIndex: ${globalPlayIndex}`, 'debug');
 
 startAd();
 
 </script>
-
 </body>
 </html>
