@@ -5,17 +5,14 @@ const row=document.getElementById(id)
 data.forEach(movie=>{
 
 const div=document.createElement("div")
-
 div.className="poster"
 
 div.innerHTML=`
-<img src="${movie.poster}">
+<img src="${movie.poster}" alt="${movie.title}">
 `
 
 div.onclick=()=>{
-
 window.location.href=playerLink
-
 }
 
 row.appendChild(div)
