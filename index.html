@@ -1,340 +1,178 @@
 <!DOCTYPE html>
 <html>
-<head>
-<meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
 
-<title>TMA Wink Player</title>
+<head>
+
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+
+<title>TelePub</title>
 
 <style>
-html,body{
+
+body{
 margin:0;
-padding:0;
-background:black;
-height:100%;
-overflow:hidden;
-font-family:Arial;
+background:#0b0b0b;
 color:white;
+font-family:Arial;
 }
 
-/* витрина */
+.header{
+padding:20px;
+font-size:26px;
+font-weight:bold;
+}
 
-#showcase{
-position:absolute;
-top:0;
-left:0;
-width:100%;
-height:100%;
-overflow:auto;
-background:black;
-padding:16px;
-box-sizing:border-box;
-display:grid;
-grid-template-columns:repeat(2,1fr);
+.section{
+margin-bottom:30px;
+}
+
+.section-title{
+font-size:20px;
+margin-left:20px;
+margin-bottom:10px;
+}
+
+.row{
+display:flex;
+overflow-x:auto;
+padding-left:20px;
 gap:12px;
 }
 
+.row::-webkit-scrollbar{
+display:none;
+}
+
+.card{
+min-width:140px;
+cursor:pointer;
+transition:.2s;
+}
+
+.card:hover{
+transform:scale(1.05);
+}
+
 .poster{
-background:#111;
-border-radius:8px;
-overflow:hidden;
-cursor:pointer;
+width:140px;
+height:210px;
+border-radius:10px;
+object-fit:cover;
 }
 
-.poster img{
-width:100%;
-display:block;
+.title{
+font-size:13px;
+margin-top:5px;
+text-align:center;
 }
 
-/* плеер */
-
-#playerLayer{
-display:none;
-position:absolute;
-top:0;
-left:0;
-width:100%;
-height:100%;
+.hero{
+height:260px;
+background-size:cover;
+background-position:center;
+display:flex;
+align-items:flex-end;
+padding:20px;
+font-size:28px;
+font-weight:bold;
 }
 
-video{
-width:100%;
-height:100%;
-object-fit:contain;
-background:black;
-}
-
-#loader{
-position:absolute;
-top:50%;
-left:50%;
-transform:translate(-50%,-50%);
-color:white;
-}
-
-#skipBtn{
-position:absolute;
-top:20px;
-right:20px;
-background:rgba(0,0,0,.6);
-color:white;
-padding:8px 14px;
-border-radius:6px;
-display:none;
-cursor:pointer;
-z-index:10;
-}
-
-#muteBtn{
-position:absolute;
-bottom:20px;
-right:20px;
-background:rgba(0,0,0,.6);
-color:white;
-padding:8px 14px;
-border-radius:6px;
-cursor:pointer;
-z-index:10;
-}
-
-#clickLayer{
-position:absolute;
-top:0;
-left:0;
-width:100%;
-height:100%;
-}
 </style>
+
 </head>
 
 <body>
 
-<!-- ВИТРИНА -->
+<div class="hero" id="hero"></div>
 
-<div id="showcase">
+<div class="header">Онлайн кинотеатр</div>
 
-<div class="poster"><img src="https://picsum.photos/300/450?1"></div>
-<div class="poster"><img src="https://picsum.photos/300/450?2"></div>
-<div class="poster"><img src="https://picsum.photos/300/450?3"></div>
-<div class="poster"><img src="https://picsum.photos/300/450?4"></div>
-
-</div>
-
-<!-- ПЛЕЕР -->
-
-<div id="playerLayer">
-
-<div id="loader">Загрузка рекламы...</div>
-<div id="skipBtn">Пропустить</div>
-<div id="muteBtn">🔇</div>
-<div id="clickLayer"></div>
-
-<video id="adVideo" playsinline muted autoplay></video>
-
-</div>
+<div id="content"></div>
 
 <script>
 
-const tg = window.Telegram?.WebApp;
-if(tg) tg.expand();
+const sections = [
 
-/* витрина */
+{
+title:"Популярные",
+items:[
+{title:"Слово пацана",poster:"https://image.tmdb.org/t/p/w500/8WUVHemHFH2ZIP6NWkwlHWsyrEL.jpg"},
+{title:"Молодёжка",poster:"https://image.tmdb.org/t/p/w500/xEoJt6rMUR3pvN8MPWXc2MvmXrB.jpg"},
+{title:"Кухня",poster:"https://image.tmdb.org/t/p/w500/kOqO2E2N3npa9eKJeNEqXWiwxup.jpg"},
+{title:"Бригада",poster:"https://image.tmdb.org/t/p/w500/eFh8g1H7qzq8qgqgqgq.jpg"},
+{title:"Интерны",poster:"https://image.tmdb.org/t/p/w500/jlmuOD87mpy4V/mH.jpg"}
+]
+},
 
-const posters=document.querySelectorAll(".poster");
-const showcase=document.getElementById("showcase");
-const playerLayer=document.getElementById("playerLayer");
+{
+title:"Комедии",
+items:[
+{title:"Кухня",poster:"https://image.tmdb.org/t/p/w500/kOqO2E2N3npa9eKJeNEqXWiwxup.jpg"},
+{title:"Интерны",poster:"https://image.tmdb.org/t/p/w500/jlmuOD87mpy4V/mH.jpg"},
+{title:"Полицейский с Рублевки",poster:"https://image.tmdb.org/t/p/w500/yIuZ8H6.jpg"}
+]
+},
 
-posters.forEach(p=>{
-p.onclick=()=>{
-showcase.style.display="none";
-playerLayer.style.display="block";
-loadVast();
-};
-});
-
-/* оригинальный код рекламы */
-
-const video = document.getElementById("adVideo");
-const loader = document.getElementById("loader");
-const skipBtn = document.getElementById("skipBtn");
-const muteBtn = document.getElementById("muteBtn");
-const clickLayer = document.getElementById("clickLayer");
-
-let tracking = {};
-let clickThroughUrl = null;
-let quartiles = {};
-let skipAvailable = false;
-
-function newDeviceId(){
-return crypto.randomUUID();
+{
+title:"Криминал",
+items:[
+{title:"Слово пацана",poster:"https://image.tmdb.org/t/p/w500/8WUVHemHFH2ZIP6NWkwlHWsyrEL.jpg"},
+{title:"Бригада",poster:"https://image.tmdb.org/t/p/w500/eFh8g1H7qzq8qgqgqgq.jpg"}
+]
 }
 
-function buildVastUrl(){
+]
 
-const deviceId = newDeviceId();
-const domain = location.hostname || "t.me";
-const cb = Date.now()+Math.floor(Math.random()*999999);
+const content=document.getElementById("content")
 
-return `https://ssp.wink.ru/v1/rt/avod/vast?ad_place_type=preroll&age_value=18&broadcast_type=ott&client_id=${deviceId}&domain=${domain}&embedded=P5&is_child=false&is_paid=0&location=100001&san=web_vast_code&ad_position=1&content_id=${Math.floor(Math.random()*99999)}&device_type=NCWEB&web_client_type=mobile&cb=${cb}`;
-}
+sections.forEach(section=>{
 
-async function fetchVast(url,depth=0){
+const block=document.createElement("div")
+block.className="section"
 
-if(depth>5) throw "wrapper";
+const title=document.createElement("div")
+title.className="section-title"
+title.innerText=section.title
 
-const res = await fetch(url);
-const text = await res.text();
+const row=document.createElement("div")
+row.className="row"
 
-const xml = new DOMParser().parseFromString(text,"text/xml");
+section.items.forEach(item=>{
 
-const wrapper = xml.querySelector("Wrapper VASTAdTagURI");
+const card=document.createElement("div")
+card.className="card"
 
-if(wrapper){
-return fetchVast(wrapper.textContent.trim(),depth+1);
-}
+card.onclick=()=>{
 
-return xml;
+location.href="player.html"
 
 }
 
-function fireTracking(event){
+card.innerHTML=`
 
-if(!tracking[event]) return;
+<img class="poster" src="${item.poster}">
+<div class="title">${item.title}</div>
 
-tracking[event].forEach(url=>{
-fetch(url).catch(()=>{});
-});
+`
 
-}
+row.appendChild(card)
 
-function finishAdFlow(){
+})
 
-video.pause();
-video.currentTime=0;
+block.appendChild(title)
+block.appendChild(row)
 
-skipAvailable=false;
-skipBtn.style.display="none";
+content.appendChild(block)
 
-loader.style.display="block";
-loader.innerText="Загрузка рекламы...";
+})
 
-setTimeout(loadVast,500);
+document.getElementById("hero").style.backgroundImage=
+"url(https://image.tmdb.org/t/p/original/8WUVHemHFH2ZIP6NWkwlHWsyrEL.jpg)"
 
-}
-
-async function loadVast(){
-
-try{
-
-loader.innerText="Загрузка рекламы...";
-
-const vastUrl = buildVastUrl();
-
-const xml = await fetchVast(vastUrl);
-
-const mediaFile = xml.querySelector("MediaFile");
-
-if(!mediaFile){
-
-loader.innerText="Нет рекламы, пробуем снова";
-
-setTimeout(loadVast,1000);
-
-return;
-
-}
-
-video.src = mediaFile.textContent.trim();
-video.load();
-
-tracking={};
-clickThroughUrl=null;
-quartiles={};
-
-xml.querySelectorAll("Tracking").forEach(n=>{
-const e=n.getAttribute("event");
-if(!tracking[e]) tracking[e]=[];
-tracking[e].push(n.textContent.trim());
-});
-
-const imp=xml.querySelector("Impression");
-if(imp) tracking.impression=[imp.textContent.trim()];
-
-const clickNode=xml.querySelector("ClickThrough");
-if(clickNode) clickThroughUrl=clickNode.textContent.trim();
-
-loader.style.display="none";
-
-video.muted=true;
-
-await video.play();
-
-}catch(e){
-
-loader.innerText="Нет рекламы, повторяем";
-
-setTimeout(loadVast,1500);
-
-}
-
-}
-
-video.addEventListener("ended",()=>{
-fireTracking("complete");
-finishAdFlow();
-});
-
-video.addEventListener("timeupdate",()=>{
-
-if(!video.duration) return;
-
-const p = video.currentTime/video.duration;
-
-if(video.currentTime>=5 && !skipAvailable){
-
-skipAvailable=true;
-skipBtn.style.display="block";
-
-}
-
-if(p>=0.25 && !quartiles.q1){
-quartiles.q1=true;
-fireTracking("firstQuartile");
-}
-
-if(p>=0.5 && !quartiles.q2){
-quartiles.q2=true;
-fireTracking("midpoint");
-}
-
-if(p>=0.75 && !quartiles.q3){
-quartiles.q3=true;
-fireTracking("thirdQuartile");
-}
-
-});
-
-skipBtn.onclick=()=>{
-fireTracking("skip");
-finishAdFlow();
-};
-
-muteBtn.onclick=()=>{
-video.muted=!video.muted;
-muteBtn.innerText=video.muted?"🔇":"🔊";
-};
-
-clickLayer.onclick=()=>{
-
-if(!clickThroughUrl) return;
-
-fireTracking("click");
-
-if(tg) tg.openLink(clickThroughUrl);
-else window.open(clickThroughUrl,"_blank");
-
-};
+document.getElementById("hero").innerText="Слово пацана"
 
 </script>
+
 </body>
 </html>
