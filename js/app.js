@@ -1,3 +1,17 @@
+// Telegram Mini App fullscreen
+window.addEventListener("load", () => {
+
+if (window.Telegram && window.Telegram.WebApp) {
+
+const tg = window.Telegram.WebApp;
+
+tg.ready();
+tg.expand();
+
+}
+
+});
+
 function renderRow(id,data){
 
 const row=document.getElementById(id)
