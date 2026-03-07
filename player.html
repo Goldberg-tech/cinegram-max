@@ -1,420 +1,255 @@
 <!DOCTYPE html>
 <html>
 <head>
-
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width,initial-scale=1">
-
-<title>Video Player</title>
-
+<title>VAST Player</title>
 <style>
 
-html,body{
+body{
+background:#000;
 margin:0;
-padding:0;
-background:black;
-height:100%;
-overflow:hidden;
-font-family:Arial;
+display:flex;
+justify-content:center;
+align-items:center;
+height:100vh;
 }
 
 video{
-width:100%;
-height:100%;
-object-fit:contain;
-background:black;
+width:720px;
+background:#000;
 }
 
-#loader{
+#status{
 position:absolute;
-top:50%;
-left:50%;
-transform:translate(-50%,-50%);
-color:white;
-}
-
-#skipBtn{
-position:absolute;
-top:20px;
-right:20px;
-background:rgba(0,0,0,.6);
-color:white;
-padding:8px 14px;
-border-radius:6px;
-display:none;
-cursor:pointer;
-z-index:10;
-}
-
-#muteBtn{
-position:absolute;
-bottom:20px;
-right:20px;
-background:rgba(0,0,0,.6);
-color:white;
-padding:8px 14px;
-border-radius:6px;
-cursor:pointer;
-z-index:10;
-}
-
-#clickLayer{
-position:absolute;
-top:0;
-left:0;
-width:100%;
-height:100%;
-z-index:5;
-}
-
-#stats{
-position:absolute;
-bottom:10px;
+top:10px;
 left:10px;
-background:rgba(0,0,0,.6);
-color:white;
-font-size:12px;
-padding:6px 8px;
-border-radius:6px;
-z-index:20;
+color:#fff;
+font-family:Arial;
+font-size:14px;
 }
 
 </style>
-
 </head>
 <body>
 
-<div id="loader">Загрузка рекламы...</div>
-<div id="skipBtn">Пропустить</div>
-<div id="muteBtn">🔇</div>
-<div id="clickLayer"></div>
-<div id="stats"></div>
+<div id="status">loading ad...</div>
 
-<video id="adVideo" playsinline muted autoplay></video>
+<video id="video" playsinline></video>
 
 <script>
 
-const tg = window.Telegram?.WebApp
-if(tg) tg.expand()
+const video = document.getElementById("video");
+const status = document.getElementById("status");
 
-const video=document.getElementById("adVideo")
-const loader=document.getElementById("loader")
-const skipBtn=document.getElementById("skipBtn")
-const muteBtn=document.getElementById("muteBtn")
-const clickLayer=document.getElementById("clickLayer")
 
-let tracking={}
-let clickThrough=null
-let quartiles={}
-let skipAvailable=false
-
-/* DEVICE ROTATION */
-
+// DEVICE ID (постоянный)
 function getDevice(){
 
-let data=JSON.parse(localStorage.getItem("deviceData")||"null")
+let id = localStorage.getItem("device_id");
 
-if(!data){
+if(!id){
 
-data={
-id:crypto.randomUUID(),
-limit:Math.floor(Math.random()*3)+3,
-count:0
-}
+id = "dev_"+Math.random().toString(36).slice(2);
 
-localStorage.setItem("deviceData",JSON.stringify(data))
+localStorage.setItem("device_id",id);
 
 }
 
-if(data.count>=data.limit){
-
-data={
-id:crypto.randomUUID(),
-limit:Math.floor(Math.random()*3)+3,
-count:0
-}
-
-localStorage.setItem("deviceData",JSON.stringify(data))
+return id;
 
 }
 
-return data
 
-}
 
-function increaseDevice(){
-
-let data=JSON.parse(localStorage.getItem("deviceData"))
-
-data.count++
-
-localStorage.setItem("deviceData",JSON.stringify(data))
-
-}
-
-/* STATS */
-
-function stat(type){
-
-let s=JSON.parse(localStorage.getItem("adStats")||"{}")
-
-if(!s[type]) s[type]=0
-
-s[type]++
-
-localStorage.setItem("adStats",JSON.stringify(s))
-
-renderStats()
-
-}
-
-function renderStats(){
-
-const stats=JSON.parse(localStorage.getItem("adStats")||"{}")
-const device=JSON.parse(localStorage.getItem("deviceData")||"{}")
-
-document.getElementById("stats").innerText=
-`device: ${device.id?.slice(0,8)}
-ads: ${device.count}/${device.limit}
-
-start:${stats.start||0}
-complete:${stats.complete||0}
-skip:${stats.skip||0}
-click:${stats.click||0}`
-
-}
-
-/* VAST URL */
-
+// VAST URL
 function buildVastUrl(){
 
-const device=getDevice()
+const device = getDevice();
 
-const domain=location.hostname||"t.me"
+const cb = Date.now()+Math.floor(Math.random()*999999);
 
-const cb=Date.now()+Math.floor(Math.random()*999999)
-
-return `https://ssp.wink.ru/v1/rt/avod/vast?ad_place_type=preroll&age_value=18&broadcast_type=ott&client_id=${device.id}&domain=${domain}&embedded=P5&is_child=false&is_paid=0&location=100001&san=web_vast_code&ad_position=1&content_id=23080&device_type=MOBILE&web_client_type=mobile&cb=${cb}`
+return `https://ssp.wink.ru/v1/rt/avod/vast?ad_place_type=preroll&age_value=18&broadcast_type=ott&client_id=${device}&domain=t.me&embedded=P5&is_child=false&is_paid=0&location=100001&san=web_vast_code&ad_position=1&content_id=23080&device_type=NCWEB&web_client_type=mobile&cb=${cb}`;
 
 }
 
-/* FETCH VAST */
 
-async function fetchVast(url,depth=0){
 
-if(depth>5) throw "wrapper limit"
+// загрузка VAST
+async function fetchText(url){
 
-const r=await fetch(url)
-const txt=await r.text()
+const r = await fetch(url);
 
-const xml=new DOMParser().parseFromString(txt,"text/xml")
+return await r.text();
 
-const wrapper=xml.querySelector("Wrapper VASTAdTagURI")
+}
+
+
+
+// раскрытие wrapper
+async function resolveVast(url){
+
+let xml = await fetchText(url);
+
+
+// wrapper
+let wrapper = xml.match(/<VASTAdTagURI><!\[CDATA\[(.*?)\]\]>/);
 
 if(wrapper){
 
-return fetchVast(wrapper.textContent.trim(),depth+1)
+let next = wrapper[1].trim();
+
+console.log("wrapper →",next);
+
+return resolveVast(next);
 
 }
 
-return xml
+return xml;
 
 }
 
-/* TRACKING */
 
-function fire(event){
 
-if(!tracking[event]) return
+// извлечение mp4
+function extractMedia(xml){
 
-tracking[event].forEach(u=>{
-
-fetch(u).catch(()=>{})
-
-})
-
-}
-
-/* LOAD AD */
-
-async function loadAd(){
+let doc;
 
 try{
 
-loader.innerText="Загрузка рекламы..."
+doc = new DOMParser().parseFromString(xml,"text/xml");
 
-const url=buildVastUrl()
+let media = doc.querySelector("MediaFile");
 
-const xml=await fetchVast(url)
+if(media) return media.textContent.trim();
 
-const media=xml.querySelector("MediaFile")
+}catch(e){}
+
+
+// fallback
+let match = xml.match(/https:\/\/[^ ]+\.mp4/);
+
+if(match) return match[0];
+
+return null;
+
+}
+
+
+
+// извлечение tracking
+function extractTracking(xml){
+
+const events = {};
+
+const regex = /(https:\/\/[^ ]+(impression|start|firstQuartile|midpoint|thirdQuartile|complete)[^ ]*)/g;
+
+let m;
+
+while((m = regex.exec(xml)) !== null){
+
+let url = m[1];
+
+if(url.includes("impression")) events.impression ??= [];
+if(url.includes("start")) events.start ??= [];
+if(url.includes("firstQuartile")) events.q1 ??= [];
+if(url.includes("midpoint")) events.q2 ??= [];
+if(url.includes("thirdQuartile")) events.q3 ??= [];
+if(url.includes("complete")) events.complete ??= [];
+
+}
+
+return events;
+
+}
+
+
+
+// отправка tracking
+function fire(url){
+
+fetch(url).catch(()=>{});
+
+}
+
+
+
+// запуск рекламы
+async function startAd(){
+
+try{
+
+status.innerText="requesting ad";
+
+const vastUrl = buildVastUrl();
+
+let xml = await resolveVast(vastUrl);
+
+const media = extractMedia(xml);
 
 if(!media){
 
-loader.innerText="Нет рекламы"
+status.innerText="no ad";
 
-setTimeout(loadAd,2000)
-
-return
+return;
 
 }
 
-video.src=media.textContent.trim()
+status.innerText="playing ad";
 
-tracking={}
-clickThrough=null
-quartiles={}
+console.log("media",media);
 
-xml.querySelectorAll("Tracking").forEach(n=>{
+video.src = media;
 
-const e=n.getAttribute("event")
-
-if(!tracking[e]) tracking[e]=[]
-
-tracking[e].push(n.textContent.trim())
-
-})
-
-const imp=xml.querySelector("Impression")
-
-if(imp){
-
-tracking.impression=[imp.textContent.trim()]
-
-}
-
-const click=xml.querySelector("ClickThrough")
-
-if(click) clickThrough=click.textContent.trim()
-
-loader.style.display="none"
-
-video.muted=true
-
-await video.play()
-
-increaseDevice()
-
-stat("start")
-
-fire("start")
+video.play();
 
 }catch(e){
 
-loader.innerText="Повтор..."
+status.innerText="error";
 
-setTimeout(loadAd,2000)
-
-}
+console.error(e);
 
 }
 
-/* EVENTS */
+}
+
+
+
+// quartile tracking
+video.addEventListener("timeupdate",()=>{
+
+if(!video.duration) return;
+
+const p = video.currentTime/video.duration;
+
+if(p>0.25 && !video.q1){
+video.q1=true;
+console.log("25%");
+}
+
+if(p>0.5 && !video.q2){
+video.q2=true;
+console.log("50%");
+}
+
+if(p>0.75 && !video.q3){
+video.q3=true;
+console.log("75%");
+}
+
+});
+
+
 
 video.addEventListener("ended",()=>{
 
-fire("complete")
+status.innerText="ad finished";
 
-stat("complete")
+});
 
-finish()
 
-})
 
-video.addEventListener("timeupdate",()=>{
-
-if(!video.duration) return
-
-const p=video.currentTime/video.duration
-
-if(video.currentTime>=5 && !skipAvailable){
-
-skipAvailable=true
-
-skipBtn.style.display="block"
-
-}
-
-if(p>=0.25 && !quartiles.q1){
-
-quartiles.q1=true
-
-fire("firstQuartile")
-
-}
-
-if(p>=0.5 && !quartiles.q2){
-
-quartiles.q2=true
-
-fire("midpoint")
-
-}
-
-if(p>=0.75 && !quartiles.q3){
-
-quartiles.q3=true
-
-fire("thirdQuartile")
-
-}
-
-})
-
-function finish(){
-
-video.pause()
-
-skipBtn.style.display="none"
-
-skipAvailable=false
-
-loader.style.display="block"
-
-loader.innerText="Следующая реклама..."
-
-loadAd()
-
-}
-
-/* BUTTONS */
-
-skipBtn.onclick=()=>{
-
-fire("skip")
-
-stat("skip")
-
-finish()
-
-}
-
-muteBtn.onclick=()=>{
-
-video.muted=!video.muted
-
-muteBtn.innerText=video.muted?"🔇":"🔊"
-
-}
-
-clickLayer.onclick=()=>{
-
-if(!clickThrough) return
-
-fire("click")
-
-stat("click")
-
-if(tg) tg.openLink(clickThrough)
-else window.open(clickThrough,"_blank")
-
-}
-
-/* START */
-
-renderStats()
-
-loadAd()
+startAd();
 
 </script>
 
