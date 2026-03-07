@@ -1,17 +1,19 @@
 // Telegram Mini App init
 window.addEventListener("load", () => {
 
-if (window.Telegram && window.Telegram.WebApp) {
+if (!window.Telegram || !window.Telegram.WebApp) return;
 
 const tg = window.Telegram.WebApp;
 
 tg.ready();
 
-// пробуем fullscreen при первом тапе
-document.addEventListener("click", () => {
-tg.requestFullscreen();
-}, { once: true });
+// Fullscreen только по кнопке
+const fullscreenBtn = document.getElementById("fullscreenBtn");
 
+if (fullscreenBtn) {
+fullscreenBtn.onclick = () => {
+tg.requestFullscreen();
+};
 }
 
 });
@@ -20,6 +22,8 @@ tg.requestFullscreen();
 function renderRow(id,data){
 
 const row=document.getElementById(id)
+
+if(!row || !data) return;
 
 data.forEach(movie=>{
 
