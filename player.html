@@ -3,254 +3,194 @@
 <head>
 <meta charset="UTF-8">
 <title>VAST Player</title>
-<style>
 
+<style>
 body{
-background:#000;
-margin:0;
-display:flex;
-justify-content:center;
-align-items:center;
-height:100vh;
+  background:#000;
+  margin:0;
+  display:flex;
+  justify-content:center;
+  align-items:center;
+  height:100vh;
+  overflow:hidden;
+  font-family:Arial;
 }
 
 video{
-width:720px;
-background:#000;
+  width:720px;
+  background:#000;
 }
 
 #status{
-position:absolute;
-top:10px;
-left:10px;
-color:#fff;
-font-family:Arial;
-font-size:14px;
+  position:absolute;
+  top:10px;
+  left:10px;
+  color:#fff;
+  font-size:14px;
 }
 
+#closeBtn{
+  position:absolute;
+  top:15px;
+  right:20px;
+  color:#fff;
+  font-size:26px;
+  cursor:pointer;
+  z-index:999;
+}
+
+#skipBtn{
+  position:absolute;
+  bottom:40px;
+  right:40px;
+  padding:10px 18px;
+  background:rgba(255,255,255,0.18);
+  color:white;
+  border-radius:8px;
+  cursor:pointer;
+  display:none;
+  z-index:999;
+}
 </style>
 </head>
+
 <body>
 
 <div id="status">loading ad...</div>
+<div id="closeBtn">✕</div>
+<div id="skipBtn">Skip</div>
 
 <video id="video" playsinline></video>
 
 <script>
-
 const video = document.getElementById("video");
 const status = document.getElementById("status");
+const closeBtn = document.getElementById("closeBtn");
+const skipBtn = document.getElementById("skipBtn");
 
-
-// DEVICE ID (постоянный)
+/* DEVICE ID */
 function getDevice(){
-
-let id = localStorage.getItem("device_id");
-
-if(!id){
-
-id = "dev_"+Math.random().toString(36).slice(2);
-
-localStorage.setItem("device_id",id);
-
+  let id = localStorage.getItem("device_id");
+  if(!id){
+    id = "dev_"+Math.random().toString(36).slice(2);
+    localStorage.setItem("device_id",id);
+  }
+  return id;
 }
 
-return id;
-
+/* HASH GROUPING */
+function hashCode(str){
+  let hash = 0;
+  for(let i=0;i<str.length;i++){
+    hash = (hash<<5)-hash + str.charCodeAt(i);
+    hash |= 0;
+  }
+  return Math.abs(hash);
 }
 
+/* PLAYBACK STATE */
+let playCounter = 0;
 
-
-// VAST URL
+/* BUILD VAST URL */
 function buildVastUrl(){
+  const device = getDevice();
+  const groupSize = 3;
+  const deviceGroup = hashCode(device) % groupSize;
+  const segment = Math.floor(playCounter / groupSize);
+  const shuffle = Math.random() > 0.7 ? 1 : 0;
+  const cb = Date.now() + Math.floor(Math.random()*999999);
 
-const device = getDevice();
-
-const cb = Date.now()+Math.floor(Math.random()*999999);
-
-return `https://ssp.wink.ru/v1/rt/avod/vast?ad_place_type=preroll&age_value=18&broadcast_type=ott&client_id=${device}&domain=t.me&embedded=P5&is_child=false&is_paid=0&location=100001&san=web_vast_code&ad_position=1&content_id=23080&device_type=NCWEB&web_client_type=mobile&cb=${cb}`;
-
+  return `https://ssp.wink.ru/v1/rt/avod/vast?ad_place_type=preroll&age_value=18&broadcast_type=ott&client_id=${device}&domain=t.me&embedded=P5&is_child=false&is_paid=0&location=100001&san=web_vast_code&ad_position=1&content_id=23080&device_type=NCWEB&web_client_type=mobile&segment=${segment}&group=${deviceGroup}&shuffle=${shuffle}&play_index=${playCounter}&cb=${cb}`;
 }
 
-
-
-// загрузка VAST
+/* FETCH HELPER */
 async function fetchText(url){
-
-const r = await fetch(url);
-
-return await r.text();
-
+  const r = await fetch(url);
+  return await r.text();
 }
 
-
-
-// раскрытие wrapper
+/* RESOLVE WRAPPER */
 async function resolveVast(url){
-
-let xml = await fetchText(url);
-
-
-// wrapper
-let wrapper = xml.match(/<VASTAdTagURI><!\[CDATA\[(.*?)\]\]>/);
-
-if(wrapper){
-
-let next = wrapper[1].trim();
-
-console.log("wrapper →",next);
-
-return resolveVast(next);
-
+  let xml = await fetchText(url);
+  let wrapper = xml.match(/<VASTAdTagURI><!\[CDATA\[(.*?)\]\]>/);
+  if(wrapper){
+    let next = wrapper[1].trim();
+    console.log("wrapper →",next);
+    return resolveVast(next);
+  }
+  return xml;
 }
 
-return xml;
-
-}
-
-
-
-// извлечение mp4
+/* EXTRACT MEDIA */
 function extractMedia(xml){
-
-let doc;
-
-try{
-
-doc = new DOMParser().parseFromString(xml,"text/xml");
-
-let media = doc.querySelector("MediaFile");
-
-if(media) return media.textContent.trim();
-
-}catch(e){}
-
-
-// fallback
-let match = xml.match(/https:\/\/[^ ]+\.mp4/);
-
-if(match) return match[0];
-
-return null;
-
+  try{
+    let doc = new DOMParser().parseFromString(xml,"text/xml");
+    let media = doc.querySelector("MediaFile");
+    if(media) return media.textContent.trim();
+  }catch(e){}
+  let match = xml.match(/https:\/\/[^ ]+\.mp4/);
+  if(match) return match[0];
+  return null;
 }
 
-
-
-// извлечение tracking
-function extractTracking(xml){
-
-const events = {};
-
-const regex = /(https:\/\/[^ ]+(impression|start|firstQuartile|midpoint|thirdQuartile|complete)[^ ]*)/g;
-
-let m;
-
-while((m = regex.exec(xml)) !== null){
-
-let url = m[1];
-
-if(url.includes("impression")) events.impression ??= [];
-if(url.includes("start")) events.start ??= [];
-if(url.includes("firstQuartile")) events.q1 ??= [];
-if(url.includes("midpoint")) events.q2 ??= [];
-if(url.includes("thirdQuartile")) events.q3 ??= [];
-if(url.includes("complete")) events.complete ??= [];
-
+/* SKIP BUTTON */
+let skipTimer;
+function startSkipCountdown(){
+  skipBtn.style.display="none";
+  if(skipTimer) clearTimeout(skipTimer);
+  skipTimer = setTimeout(()=>{
+    skipBtn.style.display="block";
+  },5000);
 }
 
-return events;
-
-}
-
-
-
-// отправка tracking
-function fire(url){
-
-fetch(url).catch(()=>{});
-
-}
-
-
-
-// запуск рекламы
+/* AD PLAYER */
 async function startAd(){
+  try{
+    status.innerText="requesting ad...";
+    const vastUrl = buildVastUrl();
+    let xml = await resolveVast(vastUrl);
+    const media = extractMedia(xml);
 
-try{
+    if(!media){
+      status.innerText="no ad";
+      setTimeout(()=>{
+        playCounter++;
+        startAd();
+      },2000);
+      return;
+    }
 
-status.innerText="requesting ad";
-
-const vastUrl = buildVastUrl();
-
-let xml = await resolveVast(vastUrl);
-
-const media = extractMedia(xml);
-
-if(!media){
-
-status.innerText="no ad";
-
-return;
-
+    status.innerText="playing ad";
+    video.src = media;
+    video.play();
+    startSkipCountdown();
+    playCounter++;
+  }catch(e){
+    console.error(e);
+    status.innerText="error";
+    setTimeout(startAd,3000);
+  }
 }
 
-status.innerText="playing ad";
-
-console.log("media",media);
-
-video.src = media;
-
-video.play();
-
-}catch(e){
-
-status.innerText="error";
-
-console.error(e);
-
-}
-
-}
-
-
-
-// quartile tracking
-video.addEventListener("timeupdate",()=>{
-
-if(!video.duration) return;
-
-const p = video.currentTime/video.duration;
-
-if(p>0.25 && !video.q1){
-video.q1=true;
-console.log("25%");
-}
-
-if(p>0.5 && !video.q2){
-video.q2=true;
-console.log("50%");
-}
-
-if(p>0.75 && !video.q3){
-video.q3=true;
-console.log("75%");
-}
-
-});
-
-
-
+/* EVENTS */
 video.addEventListener("ended",()=>{
-
-status.innerText="ad finished";
-
+  status.innerText="ad finished";
+  startAd();
 });
 
+skipBtn.onclick=()=>{
+  video.pause();
+  startAd();
+};
 
+closeBtn.onclick=()=>{
+  video.pause();
+  video.src="";
+  status.innerText="closed";
+};
 
+/* AUTO START */
 startAd();
-
 </script>
 
 </body>
