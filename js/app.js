@@ -6,7 +6,7 @@ data.forEach(movie=>{
 
 const div=document.createElement("div")
 
-div.className="poster"
+div.className="oster"
 
 div.innerHTML=`
 <img src="${movie.poster}">
