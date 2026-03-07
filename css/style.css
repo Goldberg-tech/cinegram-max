@@ -6,7 +6,6 @@ font-family:-apple-system,BlinkMacSystemFont,Arial;
 }
 
 /* HERO */
-
 .hero{
 height:420px;
 position:relative;
@@ -59,7 +58,6 @@ background:linear-gradient(transparent,#000);
 }
 
 /* CONTENT */
-
 .content{
 padding:10px;
 }
@@ -70,7 +68,6 @@ font-size:22px;
 }
 
 /* ROW */
-
 .row{
 display:flex;
 overflow-x:auto;
@@ -84,7 +81,6 @@ display:none;
 }
 
 /* POSTER */
-
 .poster{
 min-width:150px;
 transition:0.25s;
@@ -104,7 +100,6 @@ transform:scale(1.08);
 }
 
 /* PLAYER */
-
 #playerWrapper{
 position:relative;
 width:720px;
@@ -118,7 +113,6 @@ background:#000;
 }
 
 /* CLOSE */
-
 #closeBtn{
 position:absolute;
 top:12px;
@@ -130,7 +124,6 @@ z-index:1000;
 }
 
 /* SKIP */
-
 #skipBtn{
 position:absolute;
 bottom:22px;
@@ -142,4 +135,21 @@ border-radius:8px;
 cursor:pointer;
 display:none;
 backdrop-filter: blur(6px);
+}
+
+/* FULLSCREEN BUTTON */
+.fullscreen-btn{
+position: fixed;
+bottom: 20px;
+right: 20px;
+width: 52px;
+height: 52px;
+border-radius: 50%;
+border: none;
+font-size: 22px;
+background: rgba(255,255,255,0.08);
+color: white;
+backdrop-filter: blur(12px);
+z-index: 999;
+cursor:pointer;
 }
