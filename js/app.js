@@ -1,26 +1,29 @@
-// Telegram Mini App init
 window.addEventListener("DOMContentLoaded", () => {
+  if (!window.Telegram || !window.Telegram.WebApp) return;
+  const tg = window.Telegram.WebApp;
+  tg.ready();
 
-if (!window.Telegram || !window.Telegram.WebApp) return;
+  // Запрашиваем fullscreen сразу при загрузке
+  try {
+    tg.expand();
+    if (typeof tg.requestFullscreen === "function") {
+      tg.requestFullscreen();
+    }
+  } catch(e) {
+    console.log("Fullscreen init failed:", e);
+  }
 
-const tg = window.Telegram.WebApp;
-
-tg.ready();
-
-// Fullscreen button handler (iPhone Telegram Mini App safe pattern)
-
-const fullscreenBtn = document.getElementById("fullscreenBtn");
-
-if (fullscreenBtn) {
-
-fullscreenBtn.addEventListener("click", () => {
-
-try {
-tg.requestFullscreen();
-} catch(e){
-console.log("Fullscreen request failed:", e);
-}
-
+  // Кнопка — на случай если пользователь вышел из fullscreen
+  const fullscreenBtn = document.getElementById("fullscreenBtn");
+  if (fullscreenBtn) {
+    fullscreenBtn.addEventListener("click", () => {
+      try {
+        tg.requestFullscreen();
+      } catch(e) {
+        console.log("Fullscreen button failed:", e);
+      }
+    });
+  }
 });
 
 }
