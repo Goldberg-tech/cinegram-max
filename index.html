@@ -67,15 +67,15 @@
 <script src="js/slider.js"></script>
 
 <script>
-  if (window.Telegram && window.Telegram.WebApp) {
-    const tg = window.Telegram.WebApp;
-
-    tg.onEvent('ready', () => {
-      tg.expand();
-    });
-
-    tg.expand();
-  }
+  (function() {
+    if (window.Telegram && window.Telegram.WebApp) {
+      const tg = window.Telegram.WebApp;
+      
+      tg.ready(() => {
+        tg.expand();
+      });
+    }
+  })();
 </script>
   
 </body>
