@@ -1,178 +1,70 @@
 <!DOCTYPE html>
-<html>
-
+<html lang="ru">
 <head>
 
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 
-<title>TelePub</title>
+<title>Telepub</title>
 
-<style>
-
-body{
-margin:0;
-background:#0b0b0b;
-color:white;
-font-family:Arial;
-}
-
-.header{
-padding:20px;
-font-size:26px;
-font-weight:bold;
-}
-
-.section{
-margin-bottom:30px;
-}
-
-.section-title{
-font-size:20px;
-margin-left:20px;
-margin-bottom:10px;
-}
-
-.row{
-display:flex;
-overflow-x:auto;
-padding-left:20px;
-gap:12px;
-}
-
-.row::-webkit-scrollbar{
-display:none;
-}
-
-.card{
-min-width:140px;
-cursor:pointer;
-transition:.2s;
-}
-
-.card:hover{
-transform:scale(1.05);
-}
-
-.poster{
-width:140px;
-height:210px;
-border-radius:10px;
-object-fit:cover;
-}
-
-.title{
-font-size:13px;
-margin-top:5px;
-text-align:center;
-}
-
-.hero{
-height:260px;
-background-size:cover;
-background-position:center;
-display:flex;
-align-items:flex-end;
-padding:20px;
-font-size:28px;
-font-weight:bold;
-}
-
-</style>
+<link rel="stylesheet" href="css/style.css">
 
 </head>
 
 <body>
 
-<div class="hero" id="hero"></div>
+<div class="hero">
 
-<div class="header">Онлайн кинотеатр</div>
+<div class="hero-slider" id="hero"></div>
 
-<div id="content"></div>
+<div class="hero-gradient"></div>
 
-<script>
+</div>
 
-const sections = [
 
-{
-title:"Популярные",
-items:[
-{title:"Слово пацана",poster:"https://image.tmdb.org/t/p/w500/8WUVHemHFH2ZIP6NWkwlHWsyrEL.jpg"},
-{title:"Молодёжка",poster:"https://image.tmdb.org/t/p/w500/xEoJt6rMUR3pvN8MPWXc2MvmXrB.jpg"},
-{title:"Кухня",poster:"https://image.tmdb.org/t/p/w500/kOqO2E2N3npa9eKJeNEqXWiwxup.jpg"},
-{title:"Бригада",poster:"https://image.tmdb.org/t/p/w500/eFh8g1H7qzq8qgqgqgq.jpg"},
-{title:"Интерны",poster:"https://image.tmdb.org/t/p/w500/jlmuOD87mpy4V/mH.jpg"}
-]
-},
+<div class="content">
 
-{
-title:"Комедии",
-items:[
-{title:"Кухня",poster:"https://image.tmdb.org/t/p/w500/kOqO2E2N3npa9eKJeNEqXWiwxup.jpg"},
-{title:"Интерны",poster:"https://image.tmdb.org/t/p/w500/jlmuOD87mpy4V/mH.jpg"},
-{title:"Полицейский с Рублевки",poster:"https://image.tmdb.org/t/p/w500/yIuZ8H6.jpg"}
-]
-},
+<section>
 
-{
-title:"Криминал",
-items:[
-{title:"Слово пацана",poster:"https://image.tmdb.org/t/p/w500/8WUVHemHFH2ZIP6NWkwlHWsyrEL.jpg"},
-{title:"Бригада",poster:"https://image.tmdb.org/t/p/w500/eFh8g1H7qzq8qgqgqgq.jpg"}
-]
-}
+<h2>Популярное</h2>
 
-]
+<div class="row" id="popular"></div>
 
-const content=document.getElementById("content")
+</section>
 
-sections.forEach(section=>{
 
-const block=document.createElement("div")
-block.className="section"
+<section>
 
-const title=document.createElement("div")
-title.className="section-title"
-title.innerText=section.title
+<h2>Сериалы</h2>
 
-const row=document.createElement("div")
-row.className="row"
+<div class="row" id="series"></div>
 
-section.items.forEach(item=>{
+</section>
 
-const card=document.createElement("div")
-card.className="card"
 
-card.onclick=()=>{
+<section>
 
-location.href="player.html"
+<h2>Комедии</h2>
 
-}
+<div class="row" id="comedy"></div>
 
-card.innerHTML=`
+</section>
 
-<img class="poster" src="${item.poster}">
-<div class="title">${item.title}</div>
 
-`
+<section>
 
-row.appendChild(card)
+<h2>Боевики</h2>
 
-})
+<div class="row" id="action"></div>
 
-block.appendChild(title)
-block.appendChild(row)
+</section>
 
-content.appendChild(block)
+</div>
 
-})
 
-document.getElementById("hero").style.backgroundImage=
-"url(https://image.tmdb.org/t/p/original/8WUVHemHFH2ZIP6NWkwlHWsyrEL.jpg)"
-
-document.getElementById("hero").innerText="Слово пацана"
-
-</script>
+<script src="js/movies.js"></script>
+<script src="js/app.js"></script>
+<script src="js/slider.js"></script>
 
 </body>
 </html>
