@@ -1,12 +1,5 @@
-// Telegram Mini App fullscreen
-window.addEventListener("load", () => {
-
-if (window.Telegram && window.Telegram.WebApp) {
-
-const tg = window.Telegram.WebApp;
-
-tg.ready();
-tg.requestFullscreen();
+let tg = window.Telegram.WebApp;
+tg.requestFullscreen()
 
 }
 
