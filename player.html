@@ -33,16 +33,15 @@ video {
   background: #000;
 }
 
+/* Оверлей и кнопки — позиционируются JS-ом относительно реального видео */
 #clickOverlay {
   position: absolute;
-  inset: 0;
   z-index: 10;
-  cursor: pointer;
+  cursor: default;
 }
 
 #videoControls {
   position: absolute;
-  inset: 0;
   z-index: 20;
   pointer-events: none;
 }
@@ -53,57 +52,57 @@ video {
   display: flex;
   align-items: center;
   justify-content: center;
-  background: rgba(0,0,0,0.45);
+  background: rgba(0,0,0,0.5);
   backdrop-filter: blur(4px);
   border-radius: 50%;
-  border: 1px solid rgba(255,255,255,0.15);
-  color: rgba(255,255,255,0.85);
+  border: 1px solid rgba(255,255,255,0.2);
+  color: rgba(255,255,255,0.9);
   cursor: pointer;
   user-select: none;
   transition: background 0.2s;
 }
-.ctrl-btn:hover { background: rgba(255,255,255,0.18); }
+.ctrl-btn:hover { background: rgba(255,255,255,0.2); }
 
 #closeBtn {
-  top: 14px;
-  right: 14px;
-  width: 36px;
-  height: 36px;
-  font-size: 20px;
+  top: 12px; right: 12px;
+  width: 36px; height: 36px;
+  font-size: 18px;
 }
 
 #muteBtn {
-  bottom: 14px;
-  left: 14px;
-  width: 36px;
-  height: 36px;
-  font-size: 18px;
+  bottom: 12px; left: 12px;
+  width: 36px; height: 36px;
+  font-size: 17px;
 }
-#muteBtn.muted { border-color: rgba(255,100,100,0.6); }
+#muteBtn.muted { border-color: rgba(255,100,100,0.7); }
 
 #skipBtn {
-  bottom: 14px;
-  right: 14px;
-  width: auto;
-  height: 36px;
+  bottom: 12px; right: 12px;
+  width: auto; height: 34px;
   border-radius: 8px;
-  padding: 0 16px;
-  font-size: 14px;
+  padding: 0 14px;
+  font-size: 13px;
+  display: none;
+}
+
+#visitBtn {
+  bottom: 54px; right: 12px;
+  width: auto; height: 34px;
+  border-radius: 8px;
+  padding: 0 14px;
+  font-size: 13px;
   display: none;
 }
 
 #logBtn {
-  bottom: 58px;
-  left: 14px;
-  width: 36px;
-  height: 36px;
+  bottom: 56px; left: 12px;
+  width: 36px; height: 36px;
   font-size: 15px;
 }
 
 #logCounter {
   position: absolute;
-  top: -4px;
-  right: -4px;
+  top: -4px; right: -4px;
   background: #e55;
   color: white;
   font-size: 9px;
@@ -118,51 +117,33 @@ video {
 
 #status {
   position: absolute;
-  top: 14px;
-  left: 14px;
-  color: rgba(255,255,255,0.75);
-  font-size: 13px;
+  top: 12px; left: 12px;
+  color: rgba(255,255,255,0.8);
+  font-size: 12px;
   z-index: 20;
-  background: rgba(0,0,0,0.4);
-  padding: 4px 10px;
+  background: rgba(0,0,0,0.45);
+  padding: 3px 10px;
   border-radius: 20px;
   backdrop-filter: blur(4px);
   pointer-events: none;
+  white-space: nowrap;
 }
 
 #debugInfo {
   position: absolute;
-  top: 46px;
-  left: 14px;
+  top: 40px; left: 12px;
   color: rgba(255,255,255,0.5);
-  font-size: 11px;
+  font-size: 10px;
   z-index: 20;
   background: rgba(0,0,0,0.3);
-  padding: 3px 8px;
+  padding: 2px 8px;
   border-radius: 10px;
   opacity: 0;
   transition: opacity 0.4s;
   pointer-events: none;
+  white-space: nowrap;
 }
 #debugInfo.visible { opacity: 1; }
-
-#clickBanner {
-  position: absolute;
-  bottom: 58px;
-  right: 14px;
-  background: rgba(0,0,0,0.5);
-  color: rgba(255,255,255,0.8);
-  font-size: 11px;
-  padding: 4px 10px;
-  border-radius: 12px;
-  backdrop-filter: blur(4px);
-  border: 1px solid rgba(255,255,255,0.15);
-  z-index: 20;
-  pointer-events: none;
-  opacity: 0;
-  transition: opacity 0.3s;
-}
-#clickBanner.visible { opacity: 1; }
 
 #logPanel {
   position: absolute;
@@ -177,9 +158,7 @@ video {
 #logPanel.open { transform: translateY(0); }
 
 #logHeader {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
+  display: flex; align-items: center; justify-content: space-between;
   padding: 14px 16px 10px;
   border-bottom: 1px solid rgba(255,255,255,0.1);
   flex-shrink: 0;
@@ -195,7 +174,6 @@ video {
   padding: 3px 10px; border: 1px solid rgba(255,100,100,0.3); border-radius: 10px;
 }
 #logClose { color: rgba(255,255,255,0.6); font-size: 22px; cursor: pointer; line-height: 1; }
-
 #sheetsStatus {
   font-size: 10px; padding: 2px 8px; border-radius: 10px;
   background: rgba(255,255,255,0.07); color: rgba(255,255,255,0.4); white-space: nowrap;
@@ -256,12 +234,12 @@ video {
 
   <div id="status">инициализация...</div>
   <div id="debugInfo"></div>
-  <div id="clickBanner">🔗 нажмите для перехода</div>
 
   <div id="videoControls">
     <div id="closeBtn" class="ctrl-btn">✕</div>
     <div id="muteBtn" class="ctrl-btn">🔊</div>
     <div id="skipBtn" class="ctrl-btn">Пропустить →</div>
+    <div id="visitBtn" class="ctrl-btn">Перейти</div>
     <div id="logBtn" class="ctrl-btn">
       ☰
       <span id="logCounter"></span>
@@ -303,10 +281,10 @@ const video        = document.getElementById("video");
 const statusEl     = document.getElementById("status");
 const debugInfo    = document.getElementById("debugInfo");
 const clickOverlay = document.getElementById("clickOverlay");
-const clickBanner  = document.getElementById("clickBanner");
 const closeBtn     = document.getElementById("closeBtn");
 const muteBtn      = document.getElementById("muteBtn");
 const skipBtn      = document.getElementById("skipBtn");
+const visitBtn     = document.getElementById("visitBtn");
 const loader       = document.getElementById("loader");
 const logBtn       = document.getElementById("logBtn");
 const logPanel     = document.getElementById("logPanel");
@@ -316,6 +294,43 @@ const logClose     = document.getElementById("logClose");
 const logDownload  = document.getElementById("logDownload");
 const logCounter   = document.getElementById("logCounter");
 const sheetsStatus = document.getElementById("sheetsStatus");
+const controls     = document.getElementById("videoControls");
+
+/* ПОЗИЦИОНИРОВАНИЕ КНОПОК ПОВЕРХ РЕАЛЬНОГО ВИДЕО */
+function getVideoRect() {
+  const vw = video.videoWidth  || video.clientWidth;
+  const vh = video.videoHeight || video.clientHeight;
+  const cw = video.clientWidth;
+  const ch = video.clientHeight;
+  if (!vw || !vh) return { x: 0, y: 0, w: cw, h: ch };
+  const scale = Math.min(cw / vw, ch / vh);
+  const w = vw * scale;
+  const h = vh * scale;
+  const x = (cw - w) / 2;
+  const y = (ch - h) / 2;
+  return { x, y, w, h };
+}
+
+function positionControls() {
+  const { x, y, w, h } = getVideoRect();
+  clickOverlay.style.left   = x + 'px';
+  clickOverlay.style.top    = y + 'px';
+  clickOverlay.style.width  = w + 'px';
+  clickOverlay.style.height = h + 'px';
+  controls.style.left   = x + 'px';
+  controls.style.top    = y + 'px';
+  controls.style.width  = w + 'px';
+  controls.style.height = h + 'px';
+  statusEl.style.left = (x + 12) + 'px';
+  statusEl.style.top  = (y + 12) + 'px';
+  debugInfo.style.left = (x + 12) + 'px';
+  debugInfo.style.top  = (y + 40) + 'px';
+}
+
+window.addEventListener('resize', positionControls);
+video.addEventListener('loadedmetadata', positionControls);
+video.addEventListener('resize', positionControls);
+requestAnimationFrame(positionControls);
 
 /* GOOGLE SHEETS */
 let sheetsQueue   = [];
@@ -392,10 +407,8 @@ window.addEventListener('unhandledrejection', e => log(`UNHANDLED: ${e.reason}`,
 
 /* ПАНЕЛЬ ЛОГОВ */
 logBtn.onclick = () => {
-  logPanelOpen = true;
-  logPanel.classList.add('open');
-  errorCount = 0;
-  logCounter.style.display = 'none';
+  logPanelOpen = true; logPanel.classList.add('open');
+  errorCount = 0; logCounter.style.display = 'none';
 };
 logClose.onclick = () => { logPanelOpen = false; logPanel.classList.remove('open'); };
 logClear.onclick = () => {
@@ -428,26 +441,37 @@ muteBtn.onclick = () => {
   log(`Звук: ${isMuted ? 'выключен' : 'включён'}`, 'info');
 };
 
-/* CLICK THROUGH */
+/* CLICK THROUGH — открываем во встроенном браузере Telegram */
 let currentClickUrl = null;
+
+function openUrl(url) {
+  log(`Переход по ссылке: ${url}`, 'ok');
+  if (window.Telegram?.WebApp?.openLink) {
+    window.Telegram.WebApp.openLink(url);
+  } else {
+    window.open(url, '_blank');
+  }
+}
 
 function setClickUrl(url) {
   currentClickUrl = url;
   if (url) {
-    clickBanner.classList.add('visible');
+    visitBtn.style.display = 'flex';
     clickOverlay.style.cursor = 'pointer';
-    log(`ClickThrough URL: ${url}`, 'info');
+    log(`ClickThrough URL установлен`, 'info');
   } else {
-    clickBanner.classList.remove('visible');
+    visitBtn.style.display = 'none';
     clickOverlay.style.cursor = 'default';
   }
 }
 
 clickOverlay.onclick = () => {
-  if (currentClickUrl) {
-    log(`Клик по рекламе → ${currentClickUrl}`, 'ok');
-    window.open(currentClickUrl, '_blank');
-  }
+  if (currentClickUrl) openUrl(currentClickUrl);
+};
+
+visitBtn.onclick = (e) => {
+  e.stopPropagation();
+  if (currentClickUrl) openUrl(currentClickUrl);
 };
 
 function extractClickThrough(xml) {
@@ -647,6 +671,7 @@ async function startAd() {
 
       if (mySession !== currentSession) return;
 
+      positionControls();
       showLoader(false);
       setStatus("▶ воспроизведение");
       setClickUrl(clickUrl);
@@ -693,8 +718,7 @@ function delay(ms) { return new Promise(resolve => setTimeout(resolve, ms)); }
 video.addEventListener("ended", () => {
   log('Видео завершено', 'ok');
   setStatus("ролик завершён");
-  resetSkip();
-  setClickUrl(null);
+  resetSkip(); setClickUrl(null);
   startAd();
 });
 video.addEventListener("error", () => {
