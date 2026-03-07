@@ -1,0 +1,268 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+<title>TMA Wink Player</title>
+
+<style>
+html,body{
+margin:0;
+padding:0;
+background:black;
+height:100%;
+overflow:hidden;
+font-family:Arial;
+}
+
+video{
+width:100%;
+height:100%;
+object-fit:contain;
+background:black;
+}
+
+#loader{
+position:absolute;
+top:50%;
+left:50%;
+transform:translate(-50%,-50%);
+color:white;
+}
+
+#skipBtn{
+position:absolute;
+top:20px;
+right:20px;
+background:rgba(0,0,0,.6);
+color:white;
+padding:8px 14px;
+border-radius:6px;
+display:none;
+cursor:pointer;
+z-index:10;
+}
+
+#muteBtn{
+position:absolute;
+bottom:20px;
+right:20px;
+background:rgba(0,0,0,.6);
+color:white;
+padding:8px 14px;
+border-radius:6px;
+cursor:pointer;
+z-index:10;
+}
+
+#clickLayer{
+position:absolute;
+top:0;
+left:0;
+width:100%;
+height:100%;
+}
+</style>
+</head>
+
+<body>
+
+<div id="loader">Загрузка рекламы...</div>
+<div id="skipBtn">Пропустить</div>
+<div id="muteBtn">🔇</div>
+<div id="clickLayer"></div>
+
+<video id="adVideo" playsinline muted autoplay></video>
+
+<script>
+
+const tg = window.Telegram?.WebApp;
+if(tg) tg.expand();
+
+const video = document.getElementById("adVideo");
+const loader = document.getElementById("loader");
+const skipBtn = document.getElementById("skipBtn");
+const muteBtn = document.getElementById("muteBtn");
+const clickLayer = document.getElementById("clickLayer");
+
+let tracking = {};
+let clickThroughUrl = null;
+let quartiles = {};
+let skipAvailable = false;
+
+function newDeviceId(){
+return crypto.randomUUID();
+}
+
+function buildVastUrl(){
+
+const deviceId = newDeviceId();
+const domain = location.hostname || "t.me";
+const cb = Date.now()+Math.floor(Math.random()*999999);
+
+return `https://ssp.wink.ru/v1/rt/avod/vast?ad_place_type=preroll&age_value=18&broadcast_type=ott&client_id=${deviceId}&domain=${domain}&embedded=P5&is_child=false&is_paid=0&location=100001&san=web_vast_code&ad_position=1&content_id=${Math.floor(Math.random()*99999)}&device_type=NCWEB&web_client_type=mobile&cb=${cb}`;
+}
+
+async function fetchVast(url,depth=0){
+
+if(depth>5) throw "wrapper";
+
+const res = await fetch(url);
+const text = await res.text();
+
+const xml = new DOMParser().parseFromString(text,"text/xml");
+
+const wrapper = xml.querySelector("Wrapper VASTAdTagURI");
+
+if(wrapper){
+return fetchVast(wrapper.textContent.trim(),depth+1);
+}
+
+return xml;
+
+}
+
+function fireTracking(event){
+
+if(!tracking[event]) return;
+
+tracking[event].forEach(url=>{
+fetch(url).catch(()=>{});
+});
+
+}
+
+function finishAdFlow(){
+
+video.pause();
+video.currentTime=0;
+
+skipAvailable=false;
+skipBtn.style.display="none";
+
+loader.style.display="block";
+loader.innerText="Загрузка рекламы...";
+
+setTimeout(loadVast,500);
+
+}
+
+async function loadVast(){
+
+try{
+
+loader.innerText="Загрузка рекламы...";
+
+const vastUrl = buildVastUrl();
+
+const xml = await fetchVast(vastUrl);
+
+const mediaFile = xml.querySelector("MediaFile");
+
+if(!mediaFile){
+
+loader.innerText="Нет рекламы, пробуем снова";
+
+setTimeout(loadVast,1000);
+
+return;
+
+}
+
+video.src = mediaFile.textContent.trim();
+video.load();
+
+tracking={};
+clickThroughUrl=null;
+quartiles={};
+
+xml.querySelectorAll("Tracking").forEach(n=>{
+const e=n.getAttribute("event");
+if(!tracking[e]) tracking[e]=[];
+tracking[e].push(n.textContent.trim());
+});
+
+const imp=xml.querySelector("Impression");
+if(imp) tracking.impression=[imp.textContent.trim()];
+
+const clickNode=xml.querySelector("ClickThrough");
+if(clickNode) clickThroughUrl=clickNode.textContent.trim();
+
+loader.style.display="none";
+
+video.muted=true;
+
+await video.play();
+
+}catch(e){
+
+loader.innerText="Нет рекламы, повторяем";
+
+setTimeout(loadVast,1500);
+
+}
+
+}
+
+video.addEventListener("ended",()=>{
+fireTracking("complete");
+finishAdFlow();
+});
+
+video.addEventListener("timeupdate",()=>{
+
+if(!video.duration) return;
+
+const p = video.currentTime/video.duration;
+
+if(video.currentTime>=5 && !skipAvailable){
+
+skipAvailable=true;
+skipBtn.style.display="block";
+
+}
+
+if(p>=0.25 && !quartiles.q1){
+quartiles.q1=true;
+fireTracking("firstQuartile");
+}
+
+if(p>=0.5 && !quartiles.q2){
+quartiles.q2=true;
+fireTracking("midpoint");
+}
+
+if(p>=0.75 && !quartiles.q3){
+quartiles.q3=true;
+fireTracking("thirdQuartile");
+}
+
+});
+
+skipBtn.onclick=()=>{
+fireTracking("skip");
+finishAdFlow();
+};
+
+muteBtn.onclick=()=>{
+video.muted=!video.muted;
+muteBtn.innerText=video.muted?"🔇":"🔊";
+};
+
+clickLayer.onclick=()=>{
+
+if(!clickThroughUrl) return;
+
+fireTracking("click");
+
+if(tg) tg.openLink(clickThroughUrl);
+else window.open(clickThroughUrl,"_blank");
+
+};
+
+loadVast();
+
+</script>
+</body>
+</html>
