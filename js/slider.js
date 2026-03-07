@@ -1,37 +1,45 @@
 const hero=document.getElementById("hero")
 
-let i=0
+function renderHero(){
 
-movies.popular.forEach(movie=>{
+movies.popular.forEach((movie,i)=>{
 
-const img=document.createElement("img")
+const slide=document.createElement("div")
+slide.className="hero-slide"
 
-img.src=movie.poster
+if(i===0) slide.classList.add("active")
 
-img.onclick=()=>{
+slide.innerHTML=`
+<img src="${movie.poster}">
+<div class="hero-info">
+<div class="hero-title">${movie.title}</div>
+</div>
+`
 
+slide.onclick=()=>{
 window.location.href=playerLink
+}
+
+hero.appendChild(slide)
+
+})
 
 }
 
-hero.appendChild(img)
+renderHero()
 
-})
-
-const slides=hero.querySelectorAll("img")
-
-slides.forEach((s,index)=>{
-
-if(index!==0)s.style.display="none"
-
-})
+let index=0
 
 setInterval(()=>{
 
-slides[i].style.display="none"
+const slides=document.querySelectorAll(".hero-slide")
 
-i=(i+1)%slides.length
+slides[index].classList.remove("active")
 
-slides[i].style.display="block"
+index++
+
+if(index>=slides.length) index=0
+
+slides[index].classList.add("active")
 
 },4000)
