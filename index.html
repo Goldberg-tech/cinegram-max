@@ -66,5 +66,14 @@
 <script src="js/app.js"></script>
 <script src="js/slider.js"></script>
 
+  <!-- Скрипт для автоматического раскрытия на весь экран -->
+<script>
+  window.onload = () => {
+    if (window.Telegram && window.Telegram.WebApp) {
+      window.Telegram.WebApp.expand();
+    }
+  };
+</script>
+  
 </body>
 </html>
