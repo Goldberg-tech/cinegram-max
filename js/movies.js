@@ -38,7 +38,7 @@ poster:"https://st.kp.yandex.net/images/film_big/689066.jpg"
 comedy:[
 
 {
-title:"Холоп",
+title:"Холопп",
 poster:"https://st.kp.yandex.net/images/film_big/1143242.jpg"
 }
 
