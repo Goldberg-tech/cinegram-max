@@ -12,11 +12,19 @@ window.addEventListener("DOMContentLoaded", () => {
       if (typeof tg.requestFullscreen === "function") tg.requestFullscreen();
     } catch(e) {}
 
-    // НЕ показываем BackButton — тогда Telegram сам показывает "✕ Закрыть"
-    // что выглядит правильно и не путает пользователя со стрелкой "назад"
+    // Отключаем вертикальный свайп-жест закрытия приложения
+    try {
+      if (typeof tg.disableVerticalSwipes === "function") {
+        tg.disableVerticalSwipes();
+      }
+    } catch(e) {}
+
+    // НЕ показываем BackButton — Telegram покажет "✕ Закрыть"
     if (tg.BackButton) tg.BackButton.hide();
 
-    /* МОДАЛ ВЫХОДА */
+    /* ----------------------------------------------------------
+       МОДАЛ ПОДТВЕРЖДЕНИЯ ВЫХОДА
+       ---------------------------------------------------------- */
     const exitModal    = document.getElementById("exitModal");
     const exitBackdrop = document.getElementById("exitBackdrop");
     const exitCancel   = document.getElementById("exitCancel");
@@ -25,12 +33,23 @@ window.addEventListener("DOMContentLoaded", () => {
     function showExitModal() { exitModal.classList.add("open"); }
     function hideExitModal() { exitModal.classList.remove("open"); }
 
+    // Перехватываем нажатие "✕ Закрыть" Telegram — показываем модал
+    tg.enableClosingConfirmation
+      ? tg.enableClosingConfirmation()  // встроенный диалог как fallback (некоторые версии TG)
+      : null;
+
+    // Основной перехват через onEvent("close") — срабатывает при попытке закрыть
+    tg.onEvent("close", () => {
+      showExitModal();
+    });
+
     exitBackdrop.addEventListener("click", hideExitModal);
     exitCancel.addEventListener("click",   hideExitModal);
-    exitConfirm.addEventListener("click",  () => tg.close());
-
-    // Перехватываем свой обработчик закрытия через событие Telegram
-    tg.onEvent("viewportChanged", () => {});
+    exitConfirm.addEventListener("click",  () => {
+      // Отключаем подтверждение и закрываем
+      try { tg.disableClosingConfirmation && tg.disableClosingConfirmation(); } catch(e) {}
+      tg.close();
+    });
   }
 
   /* ============================================================
@@ -58,13 +77,12 @@ window.addEventListener("DOMContentLoaded", () => {
       wrap.appendChild(img);
 
       const title = document.createElement("div");
-      title.className  = "poster-title";
+      title.className   = "poster-title";
       title.textContent = movie.title;
 
       div.appendChild(wrap);
       div.appendChild(title);
 
-      // Клик по ЛЮБОЙ части постера → плеер
       div.onclick = () => { window.location.href = playerLink; };
 
       row.appendChild(div);
