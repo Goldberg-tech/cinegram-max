@@ -1,8 +1,5 @@
 window.addEventListener("DOMContentLoaded", () => {
 
-  /* ============================================================
-     TELEGRAM
-     ============================================================ */
   if (window.Telegram?.WebApp) {
     const tg = window.Telegram.WebApp;
     tg.ready();
@@ -12,19 +9,18 @@ window.addEventListener("DOMContentLoaded", () => {
       if (typeof tg.requestFullscreen === "function") tg.requestFullscreen();
     } catch(e) {}
 
-    // Отключаем вертикальный свайп-жест закрытия приложения
+    // Отключаем свайп-жест закрытия (сворачивание при скролле вниз)
     try {
-      if (typeof tg.disableVerticalSwipes === "function") {
-        tg.disableVerticalSwipes();
-      }
+      if (typeof tg.disableVerticalSwipes === "function") tg.disableVerticalSwipes();
     } catch(e) {}
 
-    // НЕ показываем BackButton — Telegram покажет "✕ Закрыть"
+    // НЕ включаем enableClosingConfirmation — убирает системный диалог
+    // "Все внесенные данные могут быть утеряны"
+    // Используем только наш красивый модал
+
     if (tg.BackButton) tg.BackButton.hide();
 
-    /* ----------------------------------------------------------
-       МОДАЛ ПОДТВЕРЖДЕНИЯ ВЫХОДА
-       ---------------------------------------------------------- */
+    /* МОДАЛ ВЫХОДА */
     const exitModal    = document.getElementById("exitModal");
     const exitBackdrop = document.getElementById("exitBackdrop");
     const exitCancel   = document.getElementById("exitCancel");
@@ -33,23 +29,12 @@ window.addEventListener("DOMContentLoaded", () => {
     function showExitModal() { exitModal.classList.add("open"); }
     function hideExitModal() { exitModal.classList.remove("open"); }
 
-    // Перехватываем нажатие "✕ Закрыть" Telegram — показываем модал
-    tg.enableClosingConfirmation
-      ? tg.enableClosingConfirmation()  // встроенный диалог как fallback (некоторые версии TG)
-      : null;
-
-    // Основной перехват через onEvent("close") — срабатывает при попытке закрыть
-    tg.onEvent("close", () => {
-      showExitModal();
-    });
+    // Перехватываем кнопку "✕ Закрыть" Telegram
+    tg.onEvent("close", () => showExitModal());
 
     exitBackdrop.addEventListener("click", hideExitModal);
     exitCancel.addEventListener("click",   hideExitModal);
-    exitConfirm.addEventListener("click",  () => {
-      // Отключаем подтверждение и закрываем
-      try { tg.disableClosingConfirmation && tg.disableClosingConfirmation(); } catch(e) {}
-      tg.close();
-    });
+    exitConfirm.addEventListener("click",  () => tg.close());
   }
 
   /* ============================================================
