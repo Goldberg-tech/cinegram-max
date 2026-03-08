@@ -1,52 +1,36 @@
 window.addEventListener("DOMContentLoaded", () => {
 
   /* ============================================================
-     TELEGRAM FULLSCREEN
+     TELEGRAM
      ============================================================ */
   if (window.Telegram?.WebApp) {
     const tg = window.Telegram.WebApp;
     tg.ready();
+
     try {
       tg.expand();
       if (typeof tg.requestFullscreen === "function") tg.requestFullscreen();
     } catch(e) {}
 
-    const fullscreenBtn = document.getElementById("fullscreenBtn");
-    if (fullscreenBtn) {
-      fullscreenBtn.addEventListener("click", () => {
-        try { tg.requestFullscreen(); } catch(e) {}
-      });
-    }
+    // НЕ показываем BackButton — тогда Telegram сам показывает "✕ Закрыть"
+    // что выглядит правильно и не путает пользователя со стрелкой "назад"
+    if (tg.BackButton) tg.BackButton.hide();
 
-    /* ----------------------------------------------------------
-       МОДАЛ ПОДТВЕРЖДЕНИЯ ВЫХОДА
-       Перехватываем BackButton Telegram и системный жест «назад»
-       ---------------------------------------------------------- */
+    /* МОДАЛ ВЫХОДА */
     const exitModal    = document.getElementById("exitModal");
     const exitBackdrop = document.getElementById("exitBackdrop");
     const exitCancel   = document.getElementById("exitCancel");
     const exitConfirm  = document.getElementById("exitConfirm");
 
-    function showExitModal() {
-      exitModal.classList.add("open");
-    }
-    function hideExitModal() {
-      exitModal.classList.remove("open");
-    }
-    function doExit() {
-      tg.close();
-    }
+    function showExitModal() { exitModal.classList.add("open"); }
+    function hideExitModal() { exitModal.classList.remove("open"); }
 
-    // Кнопка «назад» Telegram
-    if (tg.BackButton) {
-      tg.BackButton.show();
-      tg.BackButton.onClick(() => showExitModal());
-    }
-
-    // Клик по бэкдропу — закрыть модал
     exitBackdrop.addEventListener("click", hideExitModal);
     exitCancel.addEventListener("click",   hideExitModal);
-    exitConfirm.addEventListener("click",  doExit);
+    exitConfirm.addEventListener("click",  () => tg.close());
+
+    // Перехватываем свой обработчик закрытия через событие Telegram
+    tg.onEvent("viewportChanged", () => {});
   }
 
   /* ============================================================
@@ -55,41 +39,34 @@ window.addEventListener("DOMContentLoaded", () => {
   function renderRow(id, data) {
     const row = document.getElementById(id);
     if (!row || !data) return;
+
     data.forEach(movie => {
-      const div = document.createElement("div");
+      const div  = document.createElement("div");
       div.className = "poster";
 
       const wrap = document.createElement("div");
       wrap.className = "poster-img-wrap";
 
       const img = document.createElement("img");
-      img.alt = movie.title;
+      img.alt     = movie.title;
       img.loading = "lazy";
-
-      // Fallback если постер не загрузился
       img.onerror = () => {
-        wrap.innerHTML = `
-          <div class="poster-placeholder">${movie.title}</div>
-          <div class="poster-play">▶</div>
-        `;
+        wrap.innerHTML = `<div class="poster-placeholder">${movie.title}</div>`;
       };
       img.src = movie.poster;
 
-      const play = document.createElement("div");
-      play.className = "poster-play";
-      play.textContent = "▶";
-
       wrap.appendChild(img);
-      wrap.appendChild(play);
 
       const title = document.createElement("div");
-      title.className = "poster-title";
+      title.className  = "poster-title";
       title.textContent = movie.title;
 
       div.appendChild(wrap);
       div.appendChild(title);
 
+      // Клик по ЛЮБОЙ части постера → плеер
       div.onclick = () => { window.location.href = playerLink; };
+
       row.appendChild(div);
     });
   }
