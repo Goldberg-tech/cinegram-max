@@ -1,0 +1,145 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Poster Checker</title>
+<style>
+  body { background: #080c14; color: #e8edf5; font-family: monospace; padding: 16px; }
+  h1 { font-size: 16px; color: #14c4b0; margin-bottom: 20px; }
+  .section { margin-bottom: 28px; }
+  .section-title { font-size: 13px; color: #888; letter-spacing: 2px; text-transform: uppercase; margin-bottom: 10px; border-bottom: 1px solid #1a3a6b; padding-bottom: 6px; }
+  .grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(120px, 1fr)); gap: 12px; }
+  .card { background: #0d1420; border-radius: 8px; overflow: hidden; border: 1px solid #1a3a6b; position: relative; }
+  .card img { width: 100%; height: 160px; object-fit: cover; display: block; }
+  .card-info { padding: 6px 8px; font-size: 10px; line-height: 1.4; }
+  .card-title { color: #e8edf5; font-weight: bold; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .card-id { color: #555; }
+  .card-status { font-size: 9px; font-weight: bold; padding: 2px 6px; border-radius: 3px; display: inline-block; margin-top: 3px; }
+  .ok    { background: rgba(14,158,142,0.2); color: #14c4b0; }
+  .fail  { background: rgba(192,57,43,0.2);  color: #e74c3c; }
+  .card.is-fail { border-color: #e74c3c; }
+  .card.is-ok   { border-color: rgba(14,158,142,0.3); }
+  .placeholder { width: 100%; height: 160px; background: linear-gradient(135deg, #111a2e, #1a3a6b); display: flex; align-items: center; justify-content: center; font-size: 24px; }
+  .summary { background: #0d1420; border: 1px solid #1a3a6b; border-radius: 8px; padding: 12px 16px; margin-bottom: 24px; font-size: 12px; display: flex; gap: 24px; }
+  .summary span { color: #888; }
+  .summary b { color: #14c4b0; }
+  .summary b.bad { color: #e74c3c; }
+  #copyBtn { background: #0e9e8e; color: #fff; border: none; padding: 8px 16px; border-radius: 6px; font-family: monospace; font-size: 12px; cursor: pointer; margin-bottom: 20px; }
+  #output { background: #0d1420; border: 1px solid #1a3a6b; border-radius: 8px; padding: 12px; font-size: 11px; color: #888; white-space: pre-wrap; max-height: 300px; overflow-y: auto; display: none; }
+</style>
+</head>
+<body>
+<h1>🎬 Poster Checker — CineGram</h1>
+<div class="summary" id="summary">Проверяю постеры...</div>
+<button id="copyBtn" onclick="copyReport()">📋 Скопировать отчёт</button>
+<div id="output"></div>
+<div id="sections"></div>
+
+<script src="js/movies.js"></script>
+<script>
+const sections = [
+  { id: "hero",    label: "Hero",        data: movies.hero },
+  { id: "popular", label: "Популярное",  data: movies.popular },
+  { id: "series",  label: "Сериалы",     data: movies.series },
+  { id: "comedy",  label: "Комедии",     data: movies.comedy },
+  { id: "action",  label: "Боевики",     data: movies.action },
+  { id: "crime",   label: "Криминал",    data: movies.crime },
+  { id: "docs",    label: "Документалки",data: movies.docs },
+];
+
+let totalOk = 0, totalFail = 0;
+const report = [];
+const container = document.getElementById("sections");
+
+sections.forEach(section => {
+  if (!section.data) return;
+
+  const sec = document.createElement("div");
+  sec.className = "section";
+  sec.innerHTML = `<div class="section-title">${section.label} (${section.data.length})</div>`;
+  const grid = document.createElement("div");
+  grid.className = "grid";
+
+  section.data.forEach(movie => {
+    const kpId = movie.poster.match(/film_big\/(\d+)/)?.[1] || "?";
+    const card = document.createElement("div");
+    card.className = "card";
+
+    // Пытаемся загрузить постер
+    const img = new Image();
+    img.crossOrigin = "anonymous";
+
+    const placeholder = document.createElement("div");
+    placeholder.className = "placeholder";
+    placeholder.textContent = "⏳";
+
+    const info = document.createElement("div");
+    info.className = "card-info";
+    info.innerHTML = `
+      <div class="card-title" title="${movie.title}">${movie.title}</div>
+      <div class="card-id">KP: ${kpId}</div>
+      <div class="card-status" id="s_${section.id}_${kpId}">...</div>
+    `;
+
+    img.onload = () => {
+      placeholder.textContent = "";
+      placeholder.style.padding = "0";
+      placeholder.style.background = "none";
+      placeholder.appendChild(img);
+      img.style.width = "100%";
+      img.style.height = "160px";
+      img.style.objectFit = "cover";
+      img.style.display = "block";
+      card.classList.add("is-ok");
+      info.querySelector(".card-status").className = "card-status ok";
+      info.querySelector(".card-status").textContent = "✓ ОК";
+      totalOk++;
+      updateSummary();
+      report.push({ section: section.label, title: movie.title, kpId, status: "OK", url: movie.poster });
+    };
+
+    img.onerror = () => {
+      placeholder.textContent = "✗";
+      placeholder.style.color = "#e74c3c";
+      placeholder.style.fontSize = "32px";
+      card.classList.add("is-fail");
+      info.querySelector(".card-status").className = "card-status fail";
+      info.querySelector(".card-status").textContent = "✗ НЕ ЗАГРУЖЕН";
+      totalFail++;
+      updateSummary();
+      report.push({ section: section.label, title: movie.title, kpId, status: "FAIL", url: movie.poster });
+    };
+
+    img.src = movie.poster + "?t=" + Date.now(); // cache-bust
+
+    card.appendChild(placeholder);
+    card.appendChild(info);
+    grid.appendChild(card);
+  });
+
+  sec.appendChild(grid);
+  container.appendChild(sec);
+});
+
+function updateSummary() {
+  const total = totalOk + totalFail;
+  document.getElementById("summary").innerHTML = `
+    <span>Проверено: <b>${total}</b></span>
+    <span>Загружено: <b>${totalOk}</b></span>
+    <span>Не загружено: <b class="bad">${totalFail}</b></span>
+  `;
+}
+
+function copyReport() {
+  const lines = report.map(r =>
+    `[${r.status}] [${r.section}] ${r.title} | KP: ${r.kpId} | ${r.url}`
+  ).join("\n");
+  navigator.clipboard?.writeText(lines).catch(() => {});
+  const out = document.getElementById("output");
+  out.style.display = "block";
+  out.textContent = lines;
+}
+</script>
+</body>
+</html>
