@@ -84,6 +84,8 @@ video {
   padding: 0 14px;
   font-size: 13px;
   display: none;
+  pointer-events: auto;
+  z-index: 30;
 }
 
 #visitBtn {
@@ -93,6 +95,8 @@ video {
   padding: 0 14px;
   font-size: 13px;
   display: none;
+  pointer-events: auto;
+  z-index: 30;
 }
 
 /* LOG PANEL */
@@ -451,14 +455,19 @@ function getActiveDevice() {
   return device;
 }
 
-// Принудительно создаём новый device_id и переключаемся на него
+// Принудительно создаём новый device_id и запоминаем его
+let forcedDeviceId = null;
 function forceNextDevice() {
   const pool = loadPool();
   const newDevice = { id: generateId(), plays: 0, cooldownUntil: 0 };
-  pool.push(newDevice);
-  if (pool.length > CONFIG.poolSize * 2) pool.shift();
+  pool.unshift(newDevice); // добавляем в начало чтобы getActiveDevice взял первым
+  if (pool.length > CONFIG.poolSize * 2) pool.pop();
   savePool(pool);
-  log(`Pool: принудительный новый ID ...${newDevice.id.slice(-6)}`, 'pool');
+  forcedDeviceId = newDevice.id;
+  // Также меняем globalPlayIndex чтобы SSP дал другой ролик
+  globalPlayIndex = Math.floor(Math.random() * 1000);
+  localStorage.setItem("vastGlobalIndex", globalPlayIndex);
+  log(`Pool: новый ID ...${newDevice.id.slice(-6)}, новый index=${globalPlayIndex}`, 'pool');
 }
 
 function recordPlay(deviceId) {
