@@ -1,70 +1,115 @@
-const playerLink = "player.html";
+"const playerLink = ""player.html"";
 
-// Постеры берутся с Кинопоиска по ID из URL фильма:
-// https://www.kinopoisk.ru/film/XXXXXX/ → ID = XXXXXX
-// Постер: https://st.kp.yandex.net/images/film_big/XXXXXX.jpg
+// Сгенерировано: 3/9/2026, 1:00:21 AM
+// poiskkino.dev API + Google Sheets
 
 const movies = {
+
   hero: [
-    { title: "Джентльмены", year: "2019", genre: "Криминал · Комедия", desc: "Британский наркобарон решает продать свой бизнес — и запускает цепочку хаоса, шантажа и предательств.", poster: "https://st.kp.yandex.net/images/film_big/1143242.jpg" },
-    { title: "Т-34", year: "2018", genre: "Боевик · Война", desc: "1944 год. Лейтенант Ивушкин и его экипаж совершают дерзкий побег из немецкого плена на легендарном танке.", poster: "https://st.kp.yandex.net/images/film_big/1041611.jpg" },
-    { title: "Майор Гром: Чумной Доктор", year: "2021", genre: "Боевик · Супергерои", desc: "Петербургский детектив Игорь Гром выходит на след таинственного мстителя в маске чумного доктора.", poster: "https://st.kp.yandex.net/images/film_big/1108577.jpg" },
-    { title: "Холоп", year: "2019", genre: "Комедия", desc: "Избалованного мажора помещают в симуляцию крепостной России XVIII века — без смартфона и привилегий.", poster: "https://st.kp.yandex.net/images/film_big/1220082.jpg" },
+  {
+    title: ""Джентльмены"",
+    poster: ""https://avatars.mds.yandex.net/get-kinopoisk-image/1599028/637271d5-61b4-4e46-ac83-6d07494c7645/600x900"",
+    year: ""2019"",
+    genre: ""Криминал · Комедия"",
+    desc: ""Британский наркобарон решает продать свой бизнес — и запускает цепочку хаоса.""
+  },
+  {
+    title: ""Холоп"",
+    poster: ""https://avatars.mds.yandex.net/get-kinopoisk-image/10893610/564d729c-ea30-42df-977f-e0cd6c0dd8ef/600x900"",
+    year: ""2019"",
+    genre: ""Комедия · Мелодрама"",
+    desc: ""27-летний московский мажор Григорий ошалел от безнаказанности. Богатый папа стабильно его отмазывает, да так, что уже обновил автопарк и оборудован...""
+  },
+  {
+    title: ""Горничная"",
+    poster: ""https://avatars.mds.yandex.net/get-kinopoisk-image/10900341/4ae682d9-4e45-4e50-addf-d46cebc9fbd5/600x900"",
+    year: ""2025"",
+    genre: ""Триллер · Драма"",
+    desc: ""Милли устраивается прислугой с проживанием к состоятельной семье Винчестер, живущей в загородном особняке. Девушка только что вышла по УДО, и ей не...""
+  },
+  {
+    title: ""Марти Великолепный"",
+    poster: ""https://avatars.mds.yandex.net/get-kinopoisk-image/10812607/227959ca-1166-45f1-870b-e65adef62c64/600x900"",
+    year: ""2025"",
+    genre: ""Драма · Комедия"",
+    desc: ""1952 год, Нью-Йорк. 23-летний амбициозный и талантливый игрок в настольный теннис Марти Маузер временно работает продавцом обуви, чтобы накопить де...""
+  }
   ],
 
   popular: [
-    { title: "Джентльмены",        poster: "https://st.kp.yandex.net/images/film_big/1143242.jpg" },
-    { title: "Т-34",               poster: "https://st.kp.yandex.net/images/film_big/1041611.jpg" },
-    { title: "Майор Гром",         poster: "https://st.kp.yandex.net/images/film_big/1108577.jpg" },
-    { title: "Холоп",              poster: "https://st.kp.yandex.net/images/film_big/1220082.jpg" },
-    { title: "Текст",              poster: "https://st.kp.yandex.net/images/film_big/1143219.jpg" },
-    { title: "Бык",                poster: "https://st.kp.yandex.net/images/film_big/1220379.jpg" },
-    { title: "Горько!",            poster: "https://st.kp.yandex.net/images/film_big/786861.jpg" },
-    { title: "Легенда №17",        poster: "https://st.kp.yandex.net/images/film_big/714888.jpg" },
+  {
+    title: ""Джентльмены"",
+    poster: ""https://avatars.mds.yandex.net/get-kinopoisk-image/1599028/637271d5-61b4-4e46-ac83-6d07494c7645/600x900"",
+    year: ""2019"",
+    genre: ""Криминал · Комедия"",
+    desc: ""Один ушлый американец ещё со студенческих лет приторговывал наркотиками, а теперь придумал схему нелегального обогащения с использованием поместий...""
+  },
+  {
+    title: ""Горничная"",
+    poster: ""https://avatars.mds.yandex.net/get-kinopoisk-image/10900341/4ae682d9-4e45-4e50-addf-d46cebc9fbd5/600x900"",
+    year: ""2025"",
+    genre: ""Триллер · Драма"",
+    desc: ""Милли устраивается прислугой с проживанием к состоятельной семье Винчестер, живущей в загородном особняке. Девушка только что вышла по УДО, и ей не...""
+  },
+  {
+    title: ""Марти Великолепный"",
+    poster: ""https://avatars.mds.yandex.net/get-kinopoisk-image/10812607/227959ca-1166-45f1-870b-e65adef62c64/600x900"",
+    year: ""2025"",
+    genre: ""Драма · Комедия"",
+    desc: ""1952 год, Нью-Йорк. 23-летний амбициозный и талантливый игрок в настольный теннис Марти Маузер временно работает продавцом обуви, чтобы накопить де...""
+  }
   ],
 
   series: [
-    { title: "Триггер",            poster: "https://st.kp.yandex.net/images/film_big/1322324.jpg" },
-    { title: "Метод",              poster: "https://st.kp.yandex.net/images/film_big/838050.jpg" },
-    { title: "Кухня",              poster: "https://st.kp.yandex.net/images/film_big/689066.jpg" },
-    { title: "Молодёжка",          poster: "https://st.kp.yandex.net/images/film_big/799299.jpg" },
-    { title: "Слово пацана",       poster: "https://st.kp.yandex.net/images/film_big/5068033.jpg" },
-    { title: "Игра в кальмара",    poster: "https://st.kp.yandex.net/images/film_big/1804402.jpg" },
-    { title: "Чернобыль",          poster: "https://st.kp.yandex.net/images/film_big/1227803.jpg" },
-    { title: "Шерлок",             poster: "https://st.kp.yandex.net/images/film_big/404900.jpg" },
+  {
+    title: ""Cuando te toca"",
+    poster: """",
+    year: ""2024"",
+    genre: ""Мелодрама · Комедия""
+  },
+  {
+    title: ""Слово пацана. Кровь на асфальте"",
+    poster: ""https://avatars.mds.yandex.net/get-kinopoisk-image/10809116/c1eec5f4-ae49-41cc-aea2-d8995486a23e/600x900"",
+    year: ""2023"",
+    genre: ""Драма · Криминал"",
+    desc: ""Казань, начало 1989 года. Пока родители борются за выживание, подростки сбиваются в уличные банды и бьются за асфальт. Буквально, чтобы контролиров...""
+  },
+  {
+    title: ""Триггер"",
+    poster: ""https://avatars.mds.yandex.net/get-kinopoisk-image/1898899/5fb7d956-d5fb-4189-9ec9-1a051aaa7f41/600x900"",
+    year: ""2018"",
+    genre: ""Драма"",
+    desc: ""Психолог Артём Стрелецкий — сторонник шоковой терапии в лечении больных. Он считает, что единственный способ для человека решить свои проблемы — эт...""
+  }
   ],
 
   comedy: [
-    { title: "Холоп",              poster: "https://st.kp.yandex.net/images/film_big/1220082.jpg" },
-    { title: "Горько!",            poster: "https://st.kp.yandex.net/images/film_big/786861.jpg" },
-    { title: "Ёлки",               poster: "https://st.kp.yandex.net/images/film_big/573209.jpg" },
-    { title: "Джентльмены",        poster: "https://st.kp.yandex.net/images/film_big/1143242.jpg" },
-    { title: "Кухня",              poster: "https://st.kp.yandex.net/images/film_big/689066.jpg" },
-    { title: "Дурак",              poster: "https://st.kp.yandex.net/images/film_big/775276.jpg" },
+  {
+    title: ""Холоп"",
+    poster: ""https://avatars.mds.yandex.net/get-kinopoisk-image/10893610/564d729c-ea30-42df-977f-e0cd6c0dd8ef/600x900"",
+    year: ""2019"",
+    genre: ""Комедия · Мелодрама"",
+    desc: ""27-летний московский мажор Григорий ошалел от безнаказанности. Богатый папа стабильно его отмазывает, да так, что уже обновил автопарк и оборудован...""
+  }
   ],
 
   action: [
-    { title: "Т-34",               poster: "https://st.kp.yandex.net/images/film_big/1041611.jpg" },
-    { title: "Майор Гром",         poster: "https://st.kp.yandex.net/images/film_big/1108577.jpg" },
-    { title: "Легенда №17",        poster: "https://st.kp.yandex.net/images/film_big/714888.jpg" },
-    { title: "Движение вверх",     poster: "https://st.kp.yandex.net/images/film_big/941567.jpg" },
-    { title: "Кинг Конг",          poster: "https://st.kp.yandex.net/images/film_big/843650.jpg" },
-    { title: "Дюна",               poster: "https://st.kp.yandex.net/images/film_big/1552311.jpg" },
+  {
+    title: ""Зеленая книга"",
+    poster: ""https://avatars.mds.yandex.net/get-kinopoisk-image/4483445/1e2ed281-b1e8-4083-b721-3ece7afc1031/600x900"",
+    year: ""2018"",
+    genre: ""Биография · Комедия"",
+    desc: ""1960-е годы. После закрытия нью-йоркского ночного клуба на ремонт вышибала Тони по прозвищу Болтун ищет подработку на пару месяцев. Как раз в это в...""
+  }
   ],
 
   crime: [
-    { title: "Джентльмены",        poster: "https://st.kp.yandex.net/images/film_big/1143242.jpg" },
-    { title: "Текст",              poster: "https://st.kp.yandex.net/images/film_big/1143219.jpg" },
-    { title: "Бык",                poster: "https://st.kp.yandex.net/images/film_big/1220379.jpg" },
-    { title: "Слово пацана",       poster: "https://st.kp.yandex.net/images/film_big/5068033.jpg" },
-    { title: "Метод",              poster: "https://st.kp.yandex.net/images/film_big/838050.jpg" },
-    { title: "Дурак",              poster: "https://st.kp.yandex.net/images/film_big/775276.jpg" },
+
   ],
 
   docs: [
-    { title: "Чернобыль",          poster: "https://st.kp.yandex.net/images/film_big/1227803.jpg" },
-    { title: "Легенда №17",        poster: "https://st.kp.yandex.net/images/film_big/714888.jpg" },
-    { title: "Движение вверх",     poster: "https://st.kp.yandex.net/images/film_big/941567.jpg" },
-    { title: "Дюна",               poster: "https://st.kp.yandex.net/images/film_big/1552311.jpg" },
+
   ],
+
 };
+"
