@@ -544,16 +544,22 @@ async function fetchWithTimeout(url, timeoutMs) {
   } catch(e) { clearTimeout(timer); throw e; }
 }
 
-async function resolveVast(url, depth = 0) {
+async function resolveVast(url, depth = 0, parentXml = '') {
   if (depth > 5) throw new Error("VAST wrapper depth exceeded");
   log(`VAST fetch [depth=${depth}]: ${url.slice(0,80)}...`, 'vast');
   const xml = await fetchWithTimeout(url, CONFIG.fetchTimeoutMs);
   log(`VAST ответ: ${xml.length} байт`, 'vast');
   const wrapper = xml.match(/<VASTAdTagURI><!\[CDATA\[([\s\S]*?)\]\]>/);
-  if (wrapper) { log(`VAST wrapper → цепочка`, 'vast'); return resolveVast(wrapper[1].trim(), depth + 1); }
-  const hasMedia = xml.includes('MediaFile') || xml.includes('.mp4');
+  if (wrapper) {
+    log(`VAST wrapper → цепочка`, 'vast');
+    // Сохраняем родительский XML — в нём может быть ClickThrough
+    return resolveVast(wrapper[1].trim(), depth + 1, parentXml + xml);
+  }
+  // Мержим дочерний + родительские XML чтобы не потерять ClickThrough
+  const merged = xml + parentXml;
+  const hasMedia = merged.includes('MediaFile') || merged.includes('.mp4');
   log(`VAST разобран. MediaFile: ${hasMedia ? 'найден ✓' : 'НЕ найден ✗'}`, hasMedia ? 'vast' : 'warn');
-  return xml;
+  return merged;
 }
 
 function extractMedia(xml) {
