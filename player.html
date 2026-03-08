@@ -33,6 +33,7 @@ video {
   background: #000;
 }
 
+/* Оверлей и кнопки — позиционируются JS-ом относительно реального видео */
 #clickOverlay {
   position: absolute;
   z-index: 10;
@@ -75,6 +76,7 @@ video {
 }
 #muteBtn.muted { border-color: rgba(255,100,100,0.7); }
 
+/* Пропустить и Перейти — правый нижний, стопкой */
 #skipBtn {
   bottom: 12px; right: 12px;
   width: auto; height: 34px;
@@ -93,6 +95,7 @@ video {
   display: none;
 }
 
+/* LOG PANEL */
 #logPanel {
   position: absolute;
   inset: 0;
@@ -143,6 +146,7 @@ video {
 .log-vast  { color: rgba(190,150,255,0.9); }
 .log-pool  { color: rgba(255,180,80,0.85); }
 
+/* LOADER */
 #loader {
   position: absolute; inset: 0; display: flex; flex-direction: column;
   align-items: center; justify-content: center;
@@ -171,8 +175,10 @@ video {
 
   <video id="video" playsinline></video>
 
+  <!-- Клик по рекламе -->
   <div id="clickOverlay"></div>
 
+  <!-- Кнопки — позиционируются относительно реального видео через JS -->
   <div id="videoControls">
     <div id="closeBtn" class="ctrl-btn">✕</div>
     <div id="muteBtn" class="ctrl-btn">🔊</div>
@@ -180,6 +186,7 @@ video {
     <div id="visitBtn" class="ctrl-btn">Перейти</div>
   </div>
 
+  <!-- Панель логов (скрытая, открывается через logClose/logClear/logDownload) -->
   <div id="logPanel">
     <div id="logHeader">
       <div id="logTitle">📋 Лог событий</div>
@@ -196,6 +203,9 @@ video {
 
 <script>
 
+/* ============================================================
+   КОНФИГ
+   ============================================================ */
 const CONFIG = {
   adsPerDevice:   3,
   poolSize:       50,
@@ -210,6 +220,9 @@ const CONFIG = {
   sheetsTypes:    ["info", "ok", "warn", "error", "pool"],
 };
 
+/* ============================================================
+   ЭЛЕМЕНТЫ
+   ============================================================ */
 const video        = document.getElementById("video");
 const clickOverlay = document.getElementById("clickOverlay");
 const closeBtn     = document.getElementById("closeBtn");
@@ -224,13 +237,19 @@ const logClose     = document.getElementById("logClose");
 const logDownload  = document.getElementById("logDownload");
 const controls     = document.getElementById("videoControls");
 
-/* ПОЗИЦИОНИРОВАНИЕ КНОПОК ПОВЕРХ РЕАЛЬНОГО ВИДЕО */
+/* ============================================================
+   ПОЗИЦИОНИРОВАНИЕ КНОПОК ПОВЕРХ РЕАЛЬНОГО ВИДЕО
+   object-fit:contain оставляет чёрные полосы — вычисляем
+   реальный прямоугольник видео и позиционируем всё внутри него
+   ============================================================ */
 function getVideoRect() {
   const vw = video.videoWidth  || video.clientWidth;
   const vh = video.videoHeight || video.clientHeight;
   const cw = video.clientWidth;
   const ch = video.clientHeight;
+
   if (!vw || !vh) return { x: 0, y: 0, w: cw, h: ch };
+
   const scale = Math.min(cw / vw, ch / vh);
   const w = vw * scale;
   const h = vh * scale;
@@ -251,12 +270,17 @@ function positionControls() {
   controls.style.height = h + 'px';
 }
 
+// Пересчитываем при изменении размеров и при загрузке метаданных видео
 window.addEventListener('resize', positionControls);
 video.addEventListener('loadedmetadata', positionControls);
 video.addEventListener('resize', positionControls);
+
+// Первоначальный вызов после рендера
 requestAnimationFrame(positionControls);
 
-/* GOOGLE SHEETS */
+/* ============================================================
+   GOOGLE SHEETS
+   ============================================================ */
 let sheetsQueue   = [];
 let sheetsSending = false;
 
@@ -284,7 +308,9 @@ async function sheetsFlush() {
   setTimeout(sheetsFlush, 300);
 }
 
-/* ЛОГГЕР */
+/* ============================================================
+   ЛОГГЕР
+   ============================================================ */
 let allLogs          = [];
 let currentSessionId = 0;
 let currentDeviceId  = "";
@@ -313,7 +339,9 @@ console.error = (...args) => { log('CONSOLE: ' + args.join(' '), 'error'); _orig
 window.addEventListener('error', e => log(`JS ERROR: ${e.message} (${e.lineno})`, 'error'));
 window.addEventListener('unhandledrejection', e => log(`UNHANDLED: ${e.reason}`, 'error'));
 
-/* ПАНЕЛЬ ЛОГОВ */
+/* ============================================================
+   ПАНЕЛЬ ЛОГОВ
+   ============================================================ */
 logClose.onclick = () => { logPanel.classList.remove('open'); };
 logClear.onclick = () => {
   logBody.innerHTML = ''; allLogs = [];
@@ -333,7 +361,9 @@ logDownload.onclick = () => {
   log('Лог скачан', 'ok');
 };
 
-/* ЗВУК */
+/* ============================================================
+   ЗВУК
+   ============================================================ */
 let isMuted = false;
 
 muteBtn.onclick = () => {
@@ -344,7 +374,9 @@ muteBtn.onclick = () => {
   log(`Звук: ${isMuted ? 'выключен' : 'включён'}`, 'info');
 };
 
-/* CLICK THROUGH */
+/* ============================================================
+   CLICK THROUGH — открываем во встроенном браузере Telegram
+   ============================================================ */
 let currentClickUrl = null;
 
 function openUrl(url) {
@@ -389,7 +421,9 @@ function extractClickThrough(xml) {
   return match ? match[1].trim() : null;
 }
 
-/* DEVICE ID POOL */
+/* ============================================================
+   DEVICE ID POOL
+   ============================================================ */
 function loadPool() {
   try { return JSON.parse(localStorage.getItem("vastPool") || "[]"); } catch(e) { return []; }
 }
@@ -417,6 +451,16 @@ function getActiveDevice() {
   return device;
 }
 
+// Принудительно создаём новый device_id и переключаемся на него
+function forceNextDevice() {
+  const pool = loadPool();
+  const newDevice = { id: generateId(), plays: 0, cooldownUntil: 0 };
+  pool.push(newDevice);
+  if (pool.length > CONFIG.poolSize * 2) pool.shift();
+  savePool(pool);
+  log(`Pool: принудительный новый ID ...${newDevice.id.slice(-6)}`, 'pool');
+}
+
 function recordPlay(deviceId) {
   const pool = loadPool();
   const device = pool.find(d => d.id === deviceId);
@@ -433,7 +477,9 @@ function recordPlay(deviceId) {
   }
 }
 
-/* УТИЛИТЫ */
+/* ============================================================
+   УТИЛИТЫ
+   ============================================================ */
 function hashCode(str) {
   let hash = 0;
   for (let i = 0; i < str.length; i++) { hash = (hash << 5) - hash + str.charCodeAt(i); hash |= 0; }
@@ -442,7 +488,9 @@ function hashCode(str) {
 function showLoader(show) { show ? loader.classList.remove("hidden") : loader.classList.add("hidden"); }
 function bumpGlobalIndex() { globalPlayIndex++; localStorage.setItem("vastGlobalIndex", globalPlayIndex); }
 
-/* VAST */
+/* ============================================================
+   VAST
+   ============================================================ */
 function buildVastUrl(deviceId, playIndex) {
   const groupSize   = 3;
   const deviceGroup = hashCode(deviceId) % groupSize;
@@ -475,17 +523,42 @@ async function resolveVast(url, depth = 0) {
 }
 
 function extractMedia(xml) {
+  // Фильтруем только реальные видеофайлы — пропускаем VPAID (.js, apiFramework="VPAID")
   try {
-    const doc   = new DOMParser().parseFromString(xml, "text/xml");
-    const media = doc.querySelector("MediaFile");
-    if (media) { const url = media.textContent.trim(); log(`Media URL: ${url.slice(0,70)}...`, 'ok'); return url; }
+    const doc    = new DOMParser().parseFromString(xml, "text/xml");
+    const mediaFiles = Array.from(doc.querySelectorAll("MediaFile"));
+
+    // Сначала ищем mp4/webm без VPAID
+    for (const m of mediaFiles) {
+      const api  = (m.getAttribute("apiFramework") || "").toUpperCase();
+      const type = (m.getAttribute("type") || "").toLowerCase();
+      const url  = m.textContent.trim();
+      if (api === "VPAID") { log(`Пропуск VPAID: ${url.slice(0,50)}`, 'warn'); continue; }
+      if (url.match(/\.(js|swf)(\?|$)/i)) { log(`Пропуск non-video: ${url.slice(0,50)}`, 'warn'); continue; }
+      if (url.match(/\.(mp4|webm|m3u8)(\?|$)/i) || type.includes("mp4") || type.includes("webm")) {
+        log(`Media URL: ${url.slice(0,70)}...`, 'ok');
+        return url;
+      }
+    }
+
+    // Если строгий фильтр ничего не нашёл — берём любой не-VPAID MediaFile
+    for (const m of mediaFiles) {
+      const api = (m.getAttribute("apiFramework") || "").toUpperCase();
+      const url = m.textContent.trim();
+      if (api === "VPAID" || url.match(/\.(js|swf)(\?|$)/i)) continue;
+      if (url.startsWith("http")) { log(`Media URL (fallback): ${url.slice(0,70)}...`, 'ok'); return url; }
+    }
   } catch(e) { log(`Ошибка парсинга XML: ${e.message}`, 'warn'); }
-  const match = xml.match(/https?:\/\/[^\s"<>]+\.mp4/i);
-  if (match) { log(`Media URL (regex): ${match[0].slice(0,70)}...`, 'ok'); return match[0]; }
+
+  // Последний шанс — regex только для mp4
+  const match = xml.match(/https?:\/\/[^\s"<>]+\.mp4[^\s"<>]*/i);
+  if (match) { log(`Media URL (regex mp4): ${match[0].slice(0,70)}...`, 'ok'); return match[0]; }
   return null;
 }
 
-/* SKIP */
+/* ============================================================
+   SKIP
+   ============================================================ */
 let skipTimer = null;
 
 function resetSkip() {
@@ -501,7 +574,9 @@ function startSkipCountdown() {
   }, CONFIG.skipDelaySec * 1000);
 }
 
-/* ОСНОВНОЙ ЦИКЛ */
+/* ============================================================
+   ОСНОВНОЙ ЦИКЛ
+   ============================================================ */
 let currentSession = 0;
 
 async function startAd() {
@@ -596,7 +671,9 @@ async function startAd() {
   }
 
   if (mySession !== currentSession) return;
-  log(`Все попытки провалились → пауза 3с`, 'error');
+  log(`Все попытки провалились → смена device + пауза 3с`, 'error');
+  // Принудительно переключаем device_id чтобы получить другую рекламу
+  forceNextDevice();
   showLoader(false);
   await delay(3000);
   startAd();
@@ -604,7 +681,9 @@ async function startAd() {
 
 function delay(ms) { return new Promise(resolve => setTimeout(resolve, ms)); }
 
-/* СОБЫТИЯ ВИДЕО */
+/* ============================================================
+   СОБЫТИЯ ВИДЕО
+   ============================================================ */
 video.addEventListener("ended", () => {
   log('Видео завершено', 'ok');
   resetSkip(); setClickUrl(null);
@@ -627,7 +706,9 @@ closeBtn.onclick = () => {
   else window.location.href = "index.html";
 };
 
-/* СТАРТ */
+/* ============================================================
+   СТАРТ
+   ============================================================ */
 log('Плеер запущен', 'ok');
 log(`Config: adsPerDevice=${CONFIG.adsPerDevice}, cooldown=${CONFIG.cooldownMs/60000}мин, poolSize=${CONFIG.poolSize}`, 'debug');
 log(`Sheets: ${CONFIG.sheetsEnabled ? 'включён ✓' : 'выключен'}`, 'info');
