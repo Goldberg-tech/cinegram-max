@@ -415,14 +415,28 @@ visitBtn.onclick = (e) => {
 };
 
 function extractClickThrough(xml) {
+  // 1. XML парсер — ищем все варианты тегов
   try {
     const doc = new DOMParser().parseFromString(xml, "text/xml");
-    const el  = doc.querySelector("ClickThrough");
-    if (el) return el.textContent.trim();
+    for (const tag of ["ClickThrough", "ClickTracking", "NonLinearClickThrough"]) {
+      const el = doc.querySelector(tag);
+      if (el) {
+        const url = el.textContent.trim();
+        if (url.startsWith("http")) { log(`ClickThrough (${tag}): найден`, 'info'); return url; }
+      }
+    }
   } catch(e) {}
-  const match = xml.match(/<ClickThrough[^>]*><!\[CDATA\[(.*?)\]\]>/s)
-             || xml.match(/<ClickThrough[^>]*>(https?:\/\/[^<]+)<\/ClickThrough>/);
-  return match ? match[1].trim() : null;
+  // 2. Regex — CDATA
+  const m1 = xml.match(/<ClickThrough[^>]*>\s*<!\[CDATA\[\s*(https?:\/\/[^\]]+?)\s*\]\]>/si);
+  if (m1) return m1[1].trim();
+  // 3. Regex — plain
+  const m2 = xml.match(/<ClickThrough[^>]*>\s*(https?:\/\/[^<\s]+)\s*<\/ClickThrough>/si);
+  if (m2) return m2[1].trim();
+  // 4. Любой http в VideoClicks
+  const m3 = xml.match(/<VideoClicks>[\s\S]*?<ClickThrough[^>]*>[\s\S]*?(https?:\/\/[^\s<"]+)/i);
+  if (m3) return m3[1].trim();
+  log('ClickThrough: не найден в VAST', 'warn');
+  return null;
 }
 
 /* ============================================================
@@ -438,6 +452,17 @@ function getActiveDevice() {
   let pool = loadPool();
   const now = Date.now();
   if (pool.length > CONFIG.poolSize * 2) pool = pool.slice(-CONFIG.poolSize * 2);
+
+  // Если был принудительный device — вернуть именно его
+  if (forcedDeviceId) {
+    let forced = pool.find(d => d.id === forcedDeviceId);
+    if (!forced) { forced = { id: forcedDeviceId, plays: 0, cooldownUntil: 0 }; pool.unshift(forced); }
+    forcedDeviceId = null; // сбрасываем после первого использования
+    savePool(pool);
+    log(`Pool: используем принудительный ...${forced.id.slice(-6)}`, 'pool');
+    return forced;
+  }
+
   let device = pool.find(d => d.plays < CONFIG.adsPerDevice && now >= (d.cooldownUntil || 0));
   if (!device) {
     let expired = pool.find(d => now >= (d.cooldownUntil || 0));
@@ -584,6 +609,28 @@ function startSkipCountdown() {
 }
 
 /* ============================================================
+   PRELOAD — предзагружаем следующий VAST пока играет текущий
+   ============================================================ */
+let preloadCache = null; // { mediaUrl, clickUrl, xml }
+
+async function preloadNext() {
+  try {
+    const device  = getActiveDevice();
+    const nextIdx = globalPlayIndex + 1;
+    const vastUrl = buildVastUrl(device.id, nextIdx);
+    const xml     = await resolveVast(vastUrl);
+    const mediaUrl = extractMedia(xml);
+    const clickUrl = extractClickThrough(xml);
+    if (mediaUrl) {
+      preloadCache = { mediaUrl, clickUrl };
+      log(`Preload: следующий ролик готов`, 'info');
+    }
+  } catch(e) {
+    preloadCache = null;
+  }
+}
+
+/* ============================================================
    ОСНОВНОЙ ЦИКЛ
    ============================================================ */
 let currentSession = 0;
@@ -612,13 +659,20 @@ async function startAd() {
     log(`Попытка ${attempt}/${CONFIG.maxRetries}`, 'info');
 
     try {
-      const vastUrl  = buildVastUrl(device.id, globalPlayIndex);
-      const xml      = await resolveVast(vastUrl);
+      let mediaUrl, clickUrl;
 
-      if (mySession !== currentSession) return;
-
-      const mediaUrl = extractMedia(xml);
-      const clickUrl = extractClickThrough(xml);
+      // Используем предзагруженный VAST если есть
+      if (preloadCache) {
+        ({ mediaUrl, clickUrl } = preloadCache);
+        preloadCache = null;
+        log(`Используем preload-кэш`, 'info');
+      } else {
+        const vastUrl = buildVastUrl(device.id, globalPlayIndex);
+        const xml     = await resolveVast(vastUrl);
+        if (mySession !== currentSession) return;
+        mediaUrl = extractMedia(xml);
+        clickUrl = extractClickThrough(xml);
+      }
 
       if (!mediaUrl) {
         log(`Попытка ${attempt}: нет медиа, пауза ${CONFIG.noAdRetryMs}мс`, 'warn');
@@ -669,6 +723,8 @@ async function startAd() {
       recordPlay(device.id);
       bumpGlobalIndex();
       log(`Ролик запущен ✓ globalIndex → ${globalPlayIndex}`, 'ok');
+      // Предзагружаем следующий VAST пока играет текущий
+      setTimeout(() => preloadNext(), 2000);
       return;
 
     } catch(e) {
