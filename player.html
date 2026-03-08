@@ -33,7 +33,6 @@ video {
   background: #000;
 }
 
-/* Оверлей и кнопки — позиционируются JS-ом относительно реального видео */
 #clickOverlay {
   position: absolute;
   z-index: 10;
@@ -64,9 +63,9 @@ video {
 .ctrl-btn:hover { background: rgba(255,255,255,0.2); }
 
 #closeBtn {
-  top: 12px; right: 12px;
-  width: 36px; height: 36px;
-  font-size: 18px;
+  top: 28px; right: 12px;
+  width: 30px; height: 30px;
+  font-size: 14px;
 }
 
 #muteBtn {
@@ -93,57 +92,6 @@ video {
   font-size: 13px;
   display: none;
 }
-
-#logBtn {
-  bottom: 56px; left: 12px;
-  width: 36px; height: 36px;
-  font-size: 15px;
-}
-
-#logCounter {
-  position: absolute;
-  top: -4px; right: -4px;
-  background: #e55;
-  color: white;
-  font-size: 9px;
-  border-radius: 8px;
-  padding: 1px 4px;
-  display: none;
-  line-height: 1.4;
-  pointer-events: none;
-  min-width: 14px;
-  text-align: center;
-}
-
-#status {
-  position: absolute;
-  top: 12px; left: 12px;
-  color: rgba(255,255,255,0.8);
-  font-size: 12px;
-  z-index: 20;
-  background: rgba(0,0,0,0.45);
-  padding: 3px 10px;
-  border-radius: 20px;
-  backdrop-filter: blur(4px);
-  pointer-events: none;
-  white-space: nowrap;
-}
-
-#debugInfo {
-  position: absolute;
-  top: 40px; left: 12px;
-  color: rgba(255,255,255,0.5);
-  font-size: 10px;
-  z-index: 20;
-  background: rgba(0,0,0,0.3);
-  padding: 2px 8px;
-  border-radius: 10px;
-  opacity: 0;
-  transition: opacity 0.4s;
-  pointer-events: none;
-  white-space: nowrap;
-}
-#debugInfo.visible { opacity: 1; }
 
 #logPanel {
   position: absolute;
@@ -174,13 +122,6 @@ video {
   padding: 3px 10px; border: 1px solid rgba(255,100,100,0.3); border-radius: 10px;
 }
 #logClose { color: rgba(255,255,255,0.6); font-size: 22px; cursor: pointer; line-height: 1; }
-#sheetsStatus {
-  font-size: 10px; padding: 2px 8px; border-radius: 10px;
-  background: rgba(255,255,255,0.07); color: rgba(255,255,255,0.4); white-space: nowrap;
-}
-#sheetsStatus.ok      { color: rgba(100,220,130,0.8); }
-#sheetsStatus.error   { color: rgba(255,100,100,0.8); }
-#sheetsStatus.sending { color: rgba(255,210,80,0.8); }
 
 #logBody {
   flex: 1; overflow-y: auto; padding: 4px 0;
@@ -232,25 +173,17 @@ video {
 
   <div id="clickOverlay"></div>
 
-  <div id="status">инициализация...</div>
-  <div id="debugInfo"></div>
-
   <div id="videoControls">
     <div id="closeBtn" class="ctrl-btn">✕</div>
     <div id="muteBtn" class="ctrl-btn">🔊</div>
     <div id="skipBtn" class="ctrl-btn">Пропустить →</div>
     <div id="visitBtn" class="ctrl-btn">Перейти</div>
-    <div id="logBtn" class="ctrl-btn">
-      ☰
-      <span id="logCounter"></span>
-    </div>
   </div>
 
   <div id="logPanel">
     <div id="logHeader">
       <div id="logTitle">📋 Лог событий</div>
       <div id="logControls">
-        <div id="sheetsStatus">● sheets</div>
         <div id="logDownload">скачать</div>
         <div id="logClear">очистить</div>
         <div id="logClose">✕</div>
@@ -278,22 +211,17 @@ const CONFIG = {
 };
 
 const video        = document.getElementById("video");
-const statusEl     = document.getElementById("status");
-const debugInfo    = document.getElementById("debugInfo");
 const clickOverlay = document.getElementById("clickOverlay");
 const closeBtn     = document.getElementById("closeBtn");
 const muteBtn      = document.getElementById("muteBtn");
 const skipBtn      = document.getElementById("skipBtn");
 const visitBtn     = document.getElementById("visitBtn");
 const loader       = document.getElementById("loader");
-const logBtn       = document.getElementById("logBtn");
 const logPanel     = document.getElementById("logPanel");
 const logBody      = document.getElementById("logBody");
 const logClear     = document.getElementById("logClear");
 const logClose     = document.getElementById("logClose");
 const logDownload  = document.getElementById("logDownload");
-const logCounter   = document.getElementById("logCounter");
-const sheetsStatus = document.getElementById("sheetsStatus");
 const controls     = document.getElementById("videoControls");
 
 /* ПОЗИЦИОНИРОВАНИЕ КНОПОК ПОВЕРХ РЕАЛЬНОГО ВИДЕО */
@@ -321,10 +249,6 @@ function positionControls() {
   controls.style.top    = y + 'px';
   controls.style.width  = w + 'px';
   controls.style.height = h + 'px';
-  statusEl.style.left = (x + 12) + 'px';
-  statusEl.style.top  = (y + 12) + 'px';
-  debugInfo.style.left = (x + 12) + 'px';
-  debugInfo.style.top  = (y + 40) + 'px';
 }
 
 window.addEventListener('resize', positionControls);
@@ -336,12 +260,6 @@ requestAnimationFrame(positionControls);
 let sheetsQueue   = [];
 let sheetsSending = false;
 
-function sheetsSetStatus(state) {
-  sheetsStatus.className = state;
-  const labels = { ok: "● sheets ✓", error: "● sheets ✗", sending: "● sheets …" };
-  sheetsStatus.textContent = labels[state] || "● sheets";
-}
-
 async function sheetsSend(entry) {
   if (!CONFIG.sheetsEnabled) return;
   if (!CONFIG.sheetsTypes.includes(entry.type)) return;
@@ -352,7 +270,6 @@ async function sheetsSend(entry) {
 async function sheetsFlush() {
   if (sheetsQueue.length === 0) { sheetsSending = false; return; }
   sheetsSending = true;
-  sheetsSetStatus("sending");
   const entry = sheetsQueue[0];
   try {
     await fetch(CONFIG.sheetsUrl, {
@@ -361,17 +278,13 @@ async function sheetsFlush() {
       body: JSON.stringify(entry)
     });
     sheetsQueue.shift();
-    sheetsSetStatus("ok");
   } catch(e) {
     sheetsQueue.shift();
-    sheetsSetStatus("error");
   }
   setTimeout(sheetsFlush, 300);
 }
 
 /* ЛОГГЕР */
-let errorCount       = 0;
-let logPanelOpen     = false;
 let allLogs          = [];
 let currentSessionId = 0;
 let currentDeviceId  = "";
@@ -392,11 +305,6 @@ function log(msg, type = 'info') {
   const record = { time, type, msg, session: currentSessionId, device: currentDeviceId ? '...'+currentDeviceId.slice(-6) : '', index: globalPlayIndex };
   allLogs.push(record);
   sheetsSend(record);
-  if ((type === 'error' || type === 'warn') && !logPanelOpen) {
-    errorCount++;
-    logCounter.style.display = 'block';
-    logCounter.textContent = errorCount > 99 ? '99+' : errorCount;
-  }
   while (logBody.children.length > 300) logBody.removeChild(logBody.firstChild);
 }
 
@@ -406,14 +314,9 @@ window.addEventListener('error', e => log(`JS ERROR: ${e.message} (${e.lineno})`
 window.addEventListener('unhandledrejection', e => log(`UNHANDLED: ${e.reason}`, 'error'));
 
 /* ПАНЕЛЬ ЛОГОВ */
-logBtn.onclick = () => {
-  logPanelOpen = true; logPanel.classList.add('open');
-  errorCount = 0; logCounter.style.display = 'none';
-};
-logClose.onclick = () => { logPanelOpen = false; logPanel.classList.remove('open'); };
+logClose.onclick = () => { logPanel.classList.remove('open'); };
 logClear.onclick = () => {
-  logBody.innerHTML = ''; allLogs = []; errorCount = 0;
-  logCounter.style.display = 'none';
+  logBody.innerHTML = ''; allLogs = [];
   log('Лог очищен', 'debug');
 };
 logDownload.onclick = () => {
@@ -441,13 +344,14 @@ muteBtn.onclick = () => {
   log(`Звук: ${isMuted ? 'выключен' : 'включён'}`, 'info');
 };
 
-/* CLICK THROUGH — открываем во встроенном браузере Telegram */
+/* CLICK THROUGH */
 let currentClickUrl = null;
 
 function openUrl(url) {
   log(`Переход по ссылке: ${url}`, 'ok');
   if (window.Telegram?.WebApp?.openLink) {
-    window.Telegram.WebApp.openLink(url);
+    // try_instant_view принудительно открывает внутренний браузер Telegram
+    window.Telegram.WebApp.openLink(url, { try_instant_view: true });
   } else {
     window.open(url, '_blank');
   }
@@ -535,12 +439,6 @@ function hashCode(str) {
   for (let i = 0; i < str.length; i++) { hash = (hash << 5) - hash + str.charCodeAt(i); hash |= 0; }
   return Math.abs(hash);
 }
-function setStatus(text) { statusEl.innerText = text; }
-function showDebug(text, ms = 3000) {
-  debugInfo.innerText = text;
-  debugInfo.classList.add("visible");
-  setTimeout(() => debugInfo.classList.remove("visible"), ms);
-}
 function showLoader(show) { show ? loader.classList.remove("hidden") : loader.classList.add("hidden"); }
 function bumpGlobalIndex() { globalPlayIndex++; localStorage.setItem("vastGlobalIndex", globalPlayIndex); }
 
@@ -622,8 +520,6 @@ async function startAd() {
   const device    = getActiveDevice();
   currentDeviceId = device.id;
 
-  setStatus("запрос рекламы...");
-  showDebug(`device: ...${device.id.slice(-6)} | play #${globalPlayIndex}`);
   log(`Device: ...${device.id.slice(-6)}, plays=${device.plays}`, 'info');
 
   for (let attempt = 1; attempt <= CONFIG.maxRetries; attempt++) {
@@ -642,12 +538,10 @@ async function startAd() {
 
       if (!mediaUrl) {
         log(`Попытка ${attempt}: нет медиа, пауза ${CONFIG.noAdRetryMs}мс`, 'warn');
-        setStatus("нет рекламы, повтор...");
         await delay(CONFIG.noAdRetryMs);
         continue;
       }
 
-      setStatus("загрузка видео...");
       log(`Загрузка видео...`, 'info');
       video.src   = mediaUrl;
       video.muted = isMuted;
@@ -673,7 +567,6 @@ async function startAd() {
 
       positionControls();
       showLoader(false);
-      setStatus("▶ воспроизведение");
       setClickUrl(clickUrl);
 
       try {
@@ -698,8 +591,6 @@ async function startAd() {
       if (mySession !== currentSession) return;
       const msg = e.name === "AbortError" ? "таймаут запроса" : e.message;
       log(`ОШИБКА попытки ${attempt}: ${msg}`, 'error');
-      setStatus(`ошибка, повтор ${attempt}/${CONFIG.maxRetries}...`);
-      showDebug(`ошибка: ${msg}`);
       await delay(CONFIG.retryDelayMs * attempt);
     }
   }
@@ -707,7 +598,6 @@ async function startAd() {
   if (mySession !== currentSession) return;
   log(`Все попытки провалились → пауза 3с`, 'error');
   showLoader(false);
-  setStatus("ошибка загрузки, следующий...");
   await delay(3000);
   startAd();
 }
@@ -717,7 +607,6 @@ function delay(ms) { return new Promise(resolve => setTimeout(resolve, ms)); }
 /* СОБЫТИЯ ВИДЕО */
 video.addEventListener("ended", () => {
   log('Видео завершено', 'ok');
-  setStatus("ролик завершён");
   resetSkip(); setClickUrl(null);
   startAd();
 });
