@@ -1,55 +1,98 @@
 <!DOCTYPE html>
 <html lang="ru">
 <head>
-
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1">
-
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>Telepub</title>
-
 <link rel="stylesheet" href="css/style.css">
-
 <script src="https://telegram.org/js/telegram-web-app.js"></script>
-
 </head>
-
 <body>
 
+<!-- ШАПКА -->
+<header class="site-header">
+  <div class="logo">Tele<span>pub</span></div>
+</header>
+
+<!-- HERO БАННЕР -->
 <div class="hero">
-<div class="hero-slider" id="hero"></div>
-<div class="hero-gradient"></div>
+  <div class="hero-slider" id="hero"></div>
+  <div class="hero-gradient"></div>
+  <div class="hero-dots" id="heroDots"></div>
 </div>
 
+<!-- ОСНОВНОЙ КОНТЕНТ -->
 <div class="content">
 
-<section>
-<h2>Популярное</h2>
-<div class="row" id="popular"></div>
-</section>
+  <section>
+    <div class="section-header">
+      <div class="section-title">Популярное</div>
+      <div class="section-line"></div>
+    </div>
+    <div class="row" id="popular"></div>
+  </section>
 
-<section>
-<h2>Сериалы</h2>
-<div class="row" id="series"></div>
-</section>
+  <section>
+    <div class="section-header">
+      <div class="section-title">Сериалы</div>
+      <div class="section-line"></div>
+    </div>
+    <div class="row" id="series"></div>
+  </section>
 
-<section>
-<h2>Комедии</h2>
-<div class="row" id="comedy"></div>
-</section>
+  <section>
+    <div class="section-header">
+      <div class="section-title">Комедии</div>
+      <div class="section-line"></div>
+    </div>
+    <div class="row" id="comedy"></div>
+  </section>
 
-<section>
-<h2>Боевики</h2>
-<div class="row" id="action"></div>
-</section>
+  <section>
+    <div class="section-header">
+      <div class="section-title">Боевики</div>
+      <div class="section-line"></div>
+    </div>
+    <div class="row" id="action"></div>
+  </section>
+
+  <section>
+    <div class="section-header">
+      <div class="section-title">Криминал</div>
+      <div class="section-line"></div>
+    </div>
+    <div class="row" id="crime"></div>
+  </section>
+
+  <section>
+    <div class="section-header">
+      <div class="section-title">Документалки</div>
+      <div class="section-line"></div>
+    </div>
+    <div class="row" id="docs"></div>
+  </section>
 
 </div>
 
-<!-- Fullscreen button -->
-<button id="fullscreenBtn" class="fullscreen-btn">⛶</button>
+<!-- КНОПКА FULLSCREEN -->
+<button id="fullscreenBtn" class="fullscreen-btn" title="Полный экран">⛶</button>
+
+<!-- МОДАЛ ПОДТВЕРЖДЕНИЯ ВЫХОДА -->
+<div class="exit-modal" id="exitModal">
+  <div class="exit-modal-backdrop" id="exitBackdrop"></div>
+  <div class="exit-modal-sheet">
+    <div class="exit-modal-handle"></div>
+    <div class="exit-modal-title">Выйти из приложения?</div>
+    <div class="exit-modal-sub">Вы уверены, что хотите закрыть Telepub?</div>
+    <div class="exit-modal-btns">
+      <button class="exit-btn-cancel"  id="exitCancel">Остаться</button>
+      <button class="exit-btn-confirm" id="exitConfirm">Выйти</button>
+    </div>
+  </div>
+</div>
 
 <script src="js/movies.js"></script>
 <script src="js/app.js"></script>
 <script src="js/slider.js"></script>
-
 </body>
 </html>
