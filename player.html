@@ -704,7 +704,7 @@ async function getActiveDevice() {
 
 // Принудительно создаём новый device_id и запоминаем его
 let forcedDeviceId = null;
-function forceNextDevice() {
+async function forceNextDevice() {
   const pool = loadPool();
   const newDevice = { id: await generateId(), plays: 0, cooldownUntil: 0 };
   pool.unshift(newDevice); // добавляем в начало чтобы getActiveDevice взял первым
@@ -993,7 +993,7 @@ async function startAd() {
         preloadCache = null;
         log(`Используем preload-кэш`, 'info');
       } else {
-        const vastUrl = buildVastUrl(device.id, globalPlayIndex);
+        const vastUrl = await buildVastUrl(device.id, globalPlayIndex);
         const xml     = await resolveVast(vastUrl);
         if (mySession !== currentSession) return;
         mediaUrl = extractMedia(xml);
@@ -1076,7 +1076,7 @@ async function startAd() {
   pingTracker(currentTrackers?.error?.map(u => u.replace("[ERRORCODE]", "900")), 'error:900');
   logStats();
   // Принудительно переключаем device_id чтобы получить другую рекламу
-  forceNextDevice();
+  await forceNextDevice();
   showLoader(false);
   await delay(3000);
   startAd();
