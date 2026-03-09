@@ -211,9 +211,9 @@ video {
    КОНФИГ
    ============================================================ */
 const CONFIG = {
-  adsPerDevice:   3,
+  adsPerDevice:   3,  // 3 показа на device_id — при случайном выборе из pool ID перемешиваются естественно
   poolSize:       50,
-  cooldownMs:     3 * 60 * 60 * 1000,  // 3 часа — естественная частота (было 30 мин)
+  cooldownMs:     30 * 24 * 60 * 60 * 1000, // 30 дней — частота ≤8/мес на один client_id
   skipDelaySec:   12,                   // 12 сек — поднимает VTR (было 5)
   fetchTimeoutMs: 8000,
   maxRetries:     3,
@@ -678,13 +678,19 @@ async function getActiveDevice() {
   if (forcedDeviceId) {
     let forced = pool.find(d => d.id === forcedDeviceId);
     if (!forced) { forced = { id: forcedDeviceId, plays: 0, cooldownUntil: 0 }; pool.unshift(forced); }
-    forcedDeviceId = null; // сбрасываем после первого использования
+    forcedDeviceId = null;
     savePool(pool);
     log(`Pool: используем принудительный ...${forced.id.slice(-6)}`, 'pool');
     return forced;
   }
 
-  let device = pool.find(d => d.plays < CONFIG.adsPerDevice && now >= (d.cooldownUntil || 0));
+  // Берём всех доступных (не исчерпали лимит, не в cooldown)
+  // и выбираем СЛУЧАЙНОГО — не первого по порядку
+  // Это имитирует естественное распределение трафика между разными пользователями
+  const available = pool.filter(d => d.plays < CONFIG.adsPerDevice && now >= (d.cooldownUntil || 0));
+  let device = available.length > 0
+    ? available[Math.floor(Math.random() * available.length)]
+    : null;
   if (!device) {
     let expired = pool.find(d => now >= (d.cooldownUntil || 0));
     if (expired) {
@@ -1158,7 +1164,7 @@ log('Плеер запущен', 'ok');
     const hint = document.createElement('div');
     hint.id = 'rotateHint';
     hint.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,.88);z-index:9999;display:flex;flex-direction:column;align-items:center;justify-content:center;color:#fff;font-size:18px;text-align:center;padding:24px;';
-    hint.innerHTML = '<div style="font-size:52px;margin-bottom:16px">&#128241;&#10145;&#65039;</div><div style="font-weight:600;margin-bottom:8px">Поверните устройство</div><div style="opacity:.7;font-size:15px">для просмотра рекламы</div>';
+    hint.innerHTML = '<div style="font-size:52px;margin-bottom:16px">&#128241;&#10145;&#65039;</div><div style="font-weight:600;margin-bottom:8px">Поверните устройство</div><div style="opacity:.7;font-size:15px">для просмотра контента</div>';
     document.body.appendChild(hint);
     const onOrient = () => {
       if (window.innerWidth > window.innerHeight) { hint.remove(); window.removeEventListener('resize', onOrient); }
