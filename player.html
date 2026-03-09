@@ -793,39 +793,23 @@ async function buildVastUrl(deviceId, playIndex) {
   const battery = batteryLevel ?? (30 + Math.floor(Math.random() * 65));
 
   const params = new URLSearchParams({
-    // Ядро — параметры из оригинального рабочего запроса
+    // Точный официальный шаблон от Wink SSP — только их параметры
     ad_place_type:    "preroll",
     age_value:        "18",
     broadcast_type:   "ott",
     client_id:        deviceId,
+    client_version:   "",             // пустой — так рекомендовал Wink
     domain:           "t.me",
-    embedded:         "P5",
+    embedded:         "P5",           // наш источник
     is_child:         "false",
     is_paid:          "0",
     location:         "100001",
     san:              "web_vast_code",
     ad_position:      "1",
     content_id:       "23080",
-    device_type:      "b2bpc",        // пробуем b2bpc — веб в enum Wink
-    web_client_type:  "mobile",
-    segment:          segment,
-    group:            deviceGroup,
-    shuffle:          shuffle,
-    play_index:       playIndex,
+    device_type:      "NCWEB",        // официальное значение для веб от Wink
+    web_client_type:  "mobile",       // mobile т.к. TMA на телефоне
     cb:               humanCb,
-
-    // Антифрод сигналы — были в версии когда реклама отдавалась
-    player_width:     pw,
-    player_height:    ph,
-    screen_width:     sw,
-    screen_height:    sh,
-    dpr:              dpr,
-    connection_type:  liveConn,
-    battery:          battery,
-    language:         lang,
-    timezone:         tz,
-    gdpr:             "0",
-    coppa:            "0",
   });
 
   return `https://ssp.wink.ru/v1/rt/avod/vast?${params.toString()}`;
