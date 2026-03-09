@@ -458,7 +458,7 @@ const movies = {
   },
   {
     title: "Однажды в Голливуде",
-    poster: "https://avatars.mds.yandex.net/get-kinopoisk-image/1900788/2a728585-702e-4552-a6d1-1d0d7f8e2127/600x900",
+    poster: "https://avatars.mds.yandex.net/get-kinopoisk-image/1599028/70580cf5-3287-42d6-8a76-2c715e2f6172/600x900",
     year: "2008",
     genre: "Драма · Комедия",
     desc: "Лента рассказывает о нелегких буднях крупного продюсера, пытающегося закончить съемки многострадальной ленты. Голливуд – место не для слабаков, и в..."
