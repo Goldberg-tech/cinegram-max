@@ -498,8 +498,7 @@ function extractTrackers(xml) {
 function pingTracker(urls, label) {
   if (!urls || !urls.length) return;
   urls.forEach(url => {
-    fetch(url, { method: "GET", mode: "no-cors", keepalive: true,
-      headers: { "User-Agent": MOBILE_UA } })
+    fetch(url, { method: "GET", mode: "no-cors", keepalive: true })
       .catch(() => {});
   });
   log(`Tracker ping: ${label} (${urls.length})`, 'info');
@@ -842,7 +841,9 @@ async function buildVastUrl(deviceId, playIndex) {
 }
 
 // UA реального мобильного Chrome — повышает доверие SSP и ставки
-const MOBILE_UA = "Mozilla/5.0 (Linux; Android 13; Pixel 7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Mobile Safari/537.36";
+// Используем реальный UA устройства — подделка UA создаёт fraud-сигнал для SSP
+// SSP видит iOS fingerprint + Android UA = несовпадение = no-fill или бан
+const MOBILE_UA = navigator.userAgent;
 
 async function fetchWithTimeout(url, timeoutMs) {
   const controller = new AbortController();
@@ -1200,7 +1201,9 @@ log(`Размер плеера: ${pw}×${ph} px — ${sizeOk ? '✓ OK' : '✗ �
 // Viewability — Intersection Observer
 const observer = new IntersectionObserver(entries => {
   const ratio = entries[0]?.intersectionRatio ?? 1;
-  if (ratio < 0.5) log(`Viewability: плеер вышел из зоны видимости (${Math.round(ratio*100)}%)`, 'warn');
+  // Не логируем viewability если показывается подсказка поворота
+  const rotateActive = !!document.getElementById('rotateHint');
+  if (ratio < 0.5 && !rotateActive) log(`Viewability: плеер вышел из зоны видимости (${Math.round(ratio*100)}%)`, 'warn');
 }, { threshold: [0, 0.5, 1.0] });
 observer.observe(document.getElementById("playerWrapper"));
 log(`globalPlayIndex: ${globalPlayIndex}`, 'debug');
