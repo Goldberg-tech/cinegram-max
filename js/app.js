@@ -11,7 +11,7 @@ window.addEventListener("DOMContentLoaded", () => {
     } catch(e) {}
     if (tg.BackButton) tg.BackButton.hide();
 
-    const exitModal    = docuent.getElementById("exitModal");
+    const exitModal    = document.getElementById("exitModal");
     const exitBackdrop = document.getElementById("exitBackdrop");
     const exitCancel   = document.getElementById("exitCancel");
     const exitConfirm  = document.getElementById("exitConfirm");
