@@ -2,279 +2,1209 @@
 <html>
 <head>
 <meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
 <title>VAST Player</title>
-
 <style>
 
-body{
-  background:#000;
-  margin:0;
-  display:flex;
-  justify-content:center;
-  align-items:center;
-  height:100vh;
-  overflow:hidden;
-  font-family:Arial;
+* { box-sizing: border-box; margin: 0; padding: 0; }
+
+body {
+  background: #000;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  height: 100vh;
+  overflow: hidden;
+  font-family: Arial, sans-serif;
 }
 
-/* PLAYER WRAPPER */
-
-#playerWrapper{
-  position:relative;
-  width:720px;
-  max-width:100vw;
-  margin:auto;
+#playerWrapper {
+  position: relative;
+  width: 100vw;
+  height: 100vh;
+  background: #000;
 }
 
-/* VIDEO */
-
-#playerWrapper video{
-  width:100%;
-  background:#000;
-  display:block;
+video {
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+  display: block;
+  background: #000;
 }
 
-/* STATUS */
-
-#status{
-  position:absolute;
-  top:10px;
-  left:10px;
-  color:#fff;
-  font-size:14px;
-  z-index:1000;
+/* Оверлей и кнопки — позиционируются JS-ом относительно реального видео */
+#clickOverlay {
+  position: absolute;
+  z-index: 10;
+  cursor: default;
 }
 
-/* CLOSE BUTTON */
-
-#closeBtn{
-  position:absolute;
-  top:12px;
-  right:16px;
-  color:#fff;
-  font-size:28px;
-  cursor:pointer;
-  z-index:1001;
+#videoControls {
+  position: absolute;
+  z-index: 20;
+  pointer-events: none;
 }
 
-/* SKIP BUTTON */
-
-#skipBtn{
-  position:absolute;
-  bottom:22px;
-  right:22px;
-  padding:10px 18px;
-  background:rgba(255,255,255,0.2);
-  color:white;
-  border-radius:8px;
-  cursor:pointer;
-  display:none;
-  z-index:1001;
-  backdrop-filter: blur(6px);
+.ctrl-btn {
+  position: absolute;
+  pointer-events: auto;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(0,0,0,0.5);
+  backdrop-filter: blur(4px);
+  border-radius: 50%;
+  border: 1px solid rgba(255,255,255,0.2);
+  color: rgba(255,255,255,0.9);
+  cursor: pointer;
+  user-select: none;
+  transition: background 0.2s;
 }
+.ctrl-btn:hover { background: rgba(255,255,255,0.2); }
+
+#closeBtn {
+  top: 28px; right: 12px;
+  width: 30px; height: 30px;
+  font-size: 14px;
+}
+
+#muteBtn {
+  bottom: 12px; left: 12px;
+  width: 36px; height: 36px;
+  font-size: 17px;
+}
+#muteBtn.muted { border-color: rgba(255,100,100,0.7); }
+
+/* Пропустить и Перейти — правый нижний, стопкой */
+#skipBtn {
+  bottom: 12px; right: 12px;
+  width: auto; height: 34px;
+  border-radius: 8px;
+  padding: 0 14px;
+  font-size: 13px;
+  display: none;
+  pointer-events: auto;
+  z-index: 30;
+}
+
+#visitBtn {
+  bottom: 54px; right: 12px;
+  width: auto; height: 34px;
+  border-radius: 8px;
+  padding: 0 14px;
+  font-size: 13px;
+  display: none;
+  pointer-events: auto;
+  z-index: 30;
+}
+
+/* LOG PANEL */
+#logPanel {
+  position: absolute;
+  inset: 0;
+  background: rgba(0,0,0,0.95);
+  z-index: 2000;
+  display: flex;
+  flex-direction: column;
+  transform: translateY(100%);
+  transition: transform 0.3s ease;
+}
+#logPanel.open { transform: translateY(0); }
+
+#logHeader {
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 14px 16px 10px;
+  border-bottom: 1px solid rgba(255,255,255,0.1);
+  flex-shrink: 0;
+}
+#logTitle { color: rgba(255,255,255,0.9); font-size: 14px; font-weight: bold; }
+#logControls { display: flex; gap: 10px; align-items: center; }
+#logDownload {
+  color: rgba(100,210,140,0.8); font-size: 12px; cursor: pointer;
+  padding: 3px 10px; border: 1px solid rgba(100,210,140,0.3); border-radius: 10px;
+}
+#logClear {
+  color: rgba(255,100,100,0.8); font-size: 12px; cursor: pointer;
+  padding: 3px 10px; border: 1px solid rgba(255,100,100,0.3); border-radius: 10px;
+}
+#logClose { color: rgba(255,255,255,0.6); font-size: 22px; cursor: pointer; line-height: 1; }
+
+#logBody {
+  flex: 1; overflow-y: auto; padding: 4px 0;
+  font-family: 'Courier New', monospace; font-size: 11px;
+}
+.log-entry {
+  display: flex; gap: 8px; padding: 5px 14px;
+  border-bottom: 1px solid rgba(255,255,255,0.04);
+  word-break: break-all; line-height: 1.5;
+}
+.log-entry:last-child { border-bottom: none; }
+.log-time { color: rgba(255,255,255,0.28); flex-shrink: 0; font-size: 10px; padding-top: 2px; min-width: 60px; }
+.log-msg  { flex: 1; }
+.log-info  { color: rgba(160,210,255,0.9); }
+.log-ok    { color: rgba(100,220,130,0.9); }
+.log-warn  { color: rgba(255,210,80,0.9); }
+.log-error { color: rgba(255,100,100,0.95); font-weight: bold; }
+.log-debug { color: rgba(170,170,170,0.6); }
+.log-vast  { color: rgba(190,150,255,0.9); }
+.log-pool  { color: rgba(255,180,80,0.85); }
+
+/* LOADER */
+#loader {
+  position: absolute; inset: 0; display: flex; flex-direction: column;
+  align-items: center; justify-content: center;
+  background: #000; z-index: 500; transition: opacity 0.4s;
+}
+#loader.hidden { opacity: 0; pointer-events: none; }
+.spinner {
+  width: 40px; height: 40px;
+  border: 3px solid rgba(255,255,255,0.15);
+  border-top-color: rgba(255,255,255,0.7);
+  border-radius: 50%; animation: spin 0.8s linear infinite; margin-bottom: 14px;
+}
+@keyframes spin { to { transform: rotate(360deg); } }
+#loader p { color: rgba(255,255,255,0.5); font-size: 13px; }
 
 </style>
 </head>
-
 <body>
 
 <div id="playerWrapper">
 
-  <div id="status">loading ad...</div>
-
-  <div id="closeBtn">✕</div>
-  <div id="skipBtn">Skip</div>
+  <div id="loader">
+    <div class="spinner"></div>
+    <p>Загрузка рекламы...</p>
+  </div>
 
   <video id="video" playsinline></video>
+
+  <!-- Клик по рекламе -->
+  <div id="clickOverlay"></div>
+
+  <!-- Кнопки — позиционируются относительно реального видео через JS -->
+  <div id="videoControls">
+    <div id="closeBtn" class="ctrl-btn">✕</div>
+    <div id="muteBtn" class="ctrl-btn">🔊</div>
+    <div id="skipBtn" class="ctrl-btn">Пропустить →</div>
+    <div id="visitBtn" class="ctrl-btn">Перейти</div>
+  </div>
+
+  <!-- Панель логов (скрытая, открывается через logClose/logClear/logDownload) -->
+  <div id="logPanel">
+    <div id="logHeader">
+      <div id="logTitle">📋 Лог событий</div>
+      <div id="logControls">
+        <div id="logDownload">скачать</div>
+        <div id="logClear">очистить</div>
+        <div id="logClose">✕</div>
+      </div>
+    </div>
+    <div id="logBody"></div>
+  </div>
 
 </div>
 
 <script>
 
-const video = document.getElementById("video");
-const status = document.getElementById("status");
-const closeBtn = document.getElementById("closeBtn");
-const skipBtn = document.getElementById("skipBtn");
+/* ============================================================
+   КОНФИГ
+   ============================================================ */
+const CONFIG = {
+  adsPerDevice:   3,
+  poolSize:       50,
+  cooldownMs:     3 * 60 * 60 * 1000,  // 3 часа — естественная частота (было 30 мин)
+  skipDelaySec:   12,                   // 12 сек — поднимает VTR (было 5)
+  fetchTimeoutMs: 8000,
+  maxRetries:     3,
+  retryDelayMs:   1500,
+  noAdRetryMs:    2000,
+  minPlayerW:     540,                  // минимальный размер плеера по KPI
+  minPlayerH:     360,
+  sheetsUrl:      "https://script.google.com/macros/s/AKfycbwmRLicIgCvj6RSYLqbFuxqkcNHqvDvPgTpeFQw-60X_O9-wVy9z5TWZo5iIEfQp4GAVQ/exec",
+  sheetsEnabled:  true,
+  sheetsTypes:    ["info", "ok", "warn", "error", "pool"],
+};
 
-/* ===== DEVICE ID ===== */
+/* ============================================================
+   ЭЛЕМЕНТЫ
+   ============================================================ */
+const video        = document.getElementById("video");
+const clickOverlay = document.getElementById("clickOverlay");
+const closeBtn     = document.getElementById("closeBtn");
+const muteBtn      = document.getElementById("muteBtn");
+const skipBtn      = document.getElementById("skipBtn");
+const visitBtn     = document.getElementById("visitBtn");
+const loader       = document.getElementById("loader");
+const logPanel     = document.getElementById("logPanel");
+const logBody      = document.getElementById("logBody");
+const logClear     = document.getElementById("logClear");
+const logClose     = document.getElementById("logClose");
+const logDownload  = document.getElementById("logDownload");
+const controls     = document.getElementById("videoControls");
 
-function getDevice(){
+/* ============================================================
+   ПОЗИЦИОНИРОВАНИЕ КНОПОК ПОВЕРХ РЕАЛЬНОГО ВИДЕО
+   object-fit:contain оставляет чёрные полосы — вычисляем
+   реальный прямоугольник видео и позиционируем всё внутри него
+   ============================================================ */
+function getVideoRect() {
+  const vw = video.videoWidth  || video.clientWidth;
+  const vh = video.videoHeight || video.clientHeight;
+  const cw = video.clientWidth;
+  const ch = video.clientHeight;
 
-  let id = localStorage.getItem("device_id");
+  if (!vw || !vh) return { x: 0, y: 0, w: cw, h: ch };
 
-  if(!id){
-    id = "dev_"+Math.random().toString(36).slice(2);
-    localStorage.setItem("device_id",id);
-  }
-
-  return id;
+  const scale = Math.min(cw / vw, ch / vh);
+  const w = vw * scale;
+  const h = vh * scale;
+  const x = (cw - w) / 2;
+  const y = (ch - h) / 2;
+  return { x, y, w, h };
 }
 
-/* HASH */
+function positionControls() {
+  const { x, y, w, h } = getVideoRect();
+  clickOverlay.style.left   = x + 'px';
+  clickOverlay.style.top    = y + 'px';
+  clickOverlay.style.width  = w + 'px';
+  clickOverlay.style.height = h + 'px';
+  controls.style.left   = x + 'px';
+  controls.style.top    = y + 'px';
+  controls.style.width  = w + 'px';
+  controls.style.height = h + 'px';
+}
 
-function hashCode(str){
-  let hash = 0;
-  for(let i=0;i<str.length;i++){
-    hash = (hash<<5)-hash + str.charCodeAt(i);
-    hash |= 0;
+// Пересчитываем при изменении размеров и при загрузке метаданных видео
+window.addEventListener('resize', positionControls);
+video.addEventListener('loadedmetadata', positionControls);
+video.addEventListener('resize', positionControls);
+
+// Первоначальный вызов после рендера
+requestAnimationFrame(positionControls);
+
+/* ============================================================
+   GOOGLE SHEETS
+   ============================================================ */
+let sheetsQueue   = [];
+let sheetsSending = false;
+
+async function sheetsSend(entry) {
+  if (!CONFIG.sheetsEnabled) return;
+  if (!CONFIG.sheetsTypes.includes(entry.type)) return;
+  sheetsQueue.push(entry);
+  if (!sheetsSending) sheetsFlush();
+}
+
+async function sheetsFlush() {
+  if (sheetsQueue.length === 0) { sheetsSending = false; return; }
+  sheetsSending = true;
+  const entry = sheetsQueue[0];
+  try {
+    await fetch(CONFIG.sheetsUrl, {
+      method: "POST", mode: "no-cors",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(entry)
+    });
+    sheetsQueue.shift();
+  } catch(e) {
+    sheetsQueue.shift();
   }
+  setTimeout(sheetsFlush, 300);
+}
+
+/* ============================================================
+   ЛОГГЕР
+   ============================================================ */
+let allLogs          = [];
+let currentSessionId = 0;
+let currentDeviceId  = "";
+let globalPlayIndex  = parseInt(localStorage.getItem("vastGlobalIndex") || "0");
+
+// Счётчики эффективности
+let statsAttempts = 0;  // всего попыток получить рекламу
+let statsSuccess  = 0;  // успешных воспроизведений
+let statsVpaid    = 0;  // пропущено VPAID
+let statsFail     = 0;  // полных провалов (все 3 попытки)
+
+function logStats() {
+  const fillRate = statsAttempts > 0 ? Math.round(statsSuccess / statsAttempts * 100) : 0;
+  log(`📊 Статистика: показов=${statsSuccess} | попыток=${statsAttempts} | fill=${fillRate}% | vpaid_skip=${statsVpaid} | провалов=${statsFail}`, 'info');
+}
+
+function ts() {
+  const d = new Date();
+  return d.toTimeString().slice(0,8) + '.' + String(d.getMilliseconds()).padStart(3,'0');
+}
+
+function log(msg, type = 'info') {
+  const time = ts();
+  const entry = document.createElement('div');
+  entry.className = 'log-entry';
+  entry.innerHTML = `<span class="log-time">${time}</span><span class="log-msg log-${type}">${msg}</span>`;
+  logBody.appendChild(entry);
+  logBody.scrollTop = logBody.scrollHeight;
+  const record = { time, type, msg, session: currentSessionId, device: currentDeviceId ? '...'+currentDeviceId.slice(-6) : '', index: globalPlayIndex };
+  allLogs.push(record);
+  sheetsSend(record);
+  while (logBody.children.length > 300) logBody.removeChild(logBody.firstChild);
+}
+
+const _origError = console.error;
+console.error = (...args) => { log('CONSOLE: ' + args.join(' '), 'error'); _origError.apply(console, args); };
+window.addEventListener('error', e => log(`JS ERROR: ${e.message} (${e.lineno})`, 'error'));
+window.addEventListener('unhandledrejection', e => log(`UNHANDLED: ${e.reason}`, 'error'));
+
+/* ============================================================
+   ПАНЕЛЬ ЛОГОВ
+   ============================================================ */
+logClose.onclick = () => { logPanel.classList.remove('open'); };
+logClear.onclick = () => {
+  logBody.innerHTML = ''; allLogs = [];
+  log('Лог очищен', 'debug');
+};
+logDownload.onclick = () => {
+  const lines = allLogs.map(r =>
+    `[${r.time}] [${r.type.toUpperCase().padEnd(5)}] [s#${r.session}] [${r.device}] [i=${r.index}] ${r.msg}`
+  ).join('\n');
+  const blob = new Blob([lines], { type: 'text/plain' });
+  const url  = URL.createObjectURL(blob);
+  const a    = document.createElement('a');
+  a.href = url;
+  a.download = `vast-log-${new Date().toISOString().slice(0,19).replace(/:/g,'-')}.txt`;
+  a.click();
+  URL.revokeObjectURL(url);
+  log('Лог скачан', 'ok');
+};
+
+/* ============================================================
+   ЗВУК
+   ============================================================ */
+let isMuted = false;
+
+muteBtn.onclick = () => {
+  isMuted = !isMuted;
+  video.muted = isMuted;
+  muteBtn.textContent = isMuted ? '🔇' : '🔊';
+  muteBtn.classList.toggle('muted', isMuted);
+  log(`Звук: ${isMuted ? 'выключен' : 'включён'}`, 'info');
+  // VAST mute/unmute трекеры — SSP отслеживает звуковое поведение
+  pingTracker(isMuted ? currentTrackers?.mute : currentTrackers?.unmute,
+              isMuted ? 'mute' : 'unmute');
+};
+
+/* ============================================================
+   CLICK THROUGH — открываем во встроенном браузере Telegram
+   ============================================================ */
+let currentClickUrl = null;
+
+function openUrl(url) {
+  log(`Переход по ссылке: ${url}`, 'ok');
+  if (window.Telegram?.WebApp?.openLink) {
+    // try_instant_view принудительно открывает внутренний браузер Telegram
+    window.Telegram.WebApp.openLink(url, { try_instant_view: true });
+  } else {
+    window.open(url, '_blank');
+  }
+}
+
+function setClickUrl(url) {
+  currentClickUrl = url;
+  if (url) {
+    visitBtn.style.display = 'flex';
+    clickOverlay.style.cursor = 'pointer';
+    log(`ClickThrough URL установлен`, 'info');
+  } else {
+    visitBtn.style.display = 'none';
+    clickOverlay.style.cursor = 'default';
+  }
+}
+
+clickOverlay.onclick = () => {
+  if (currentClickUrl) {
+    pingTracker(currentTrackers?.clickTracking, 'clickTracking');
+    openUrl(currentClickUrl);
+  }
+};
+
+visitBtn.onclick = (e) => {
+  e.stopPropagation();
+  if (currentClickUrl) openUrl(currentClickUrl);
+};
+
+/* ============================================================
+   VAST TRACKING — Impression + QuartileEvents
+   Без этого SSP не засчитывает показ как валидный
+   ============================================================ */
+let currentTrackers = null;
+
+function extractTrackers(xml) {
+  const trackers = {
+    impression:    [],
+    start:         [],
+    firstQuartile: [],
+    midpoint:      [],
+    thirdQuartile: [],
+    complete:      [],
+    skip:          [],
+    mute:          [],
+    unmute:        [],
+    clickTracking: [],
+    error:         [],
+  };
+
+  try {
+    const doc = new DOMParser().parseFromString(xml, "text/xml");
+
+    // Impression
+    doc.querySelectorAll("Impression").forEach(el => {
+      const u = el.textContent.trim(); if (u.startsWith("http")) trackers.impression.push(u);
+    });
+
+    // TrackingEvents
+    doc.querySelectorAll("Tracking").forEach(el => {
+      const event = el.getAttribute("event");
+      const u = el.textContent.trim();
+      if (event && trackers[event] && u.startsWith("http")) trackers[event].push(u);
+    });
+
+    // ClickTracking
+    doc.querySelectorAll("ClickTracking").forEach(el => {
+      const u = el.textContent.trim(); if (u.startsWith("http")) trackers.clickTracking.push(u);
+    });
+
+    // Error трекеры — пингуем при провале VAST (IAB стандарт)
+    doc.querySelectorAll("Error").forEach(el => {
+      const u = el.textContent.trim(); if (u.startsWith("http")) trackers.error.push(u);
+    });
+  } catch(e) {
+    // Regex fallback для Impression
+    const imp = xml.match(/<Impression[^>]*>(?:<!\[CDATA\[)?(https?:\/\/[^\]<]+)(?:\]\]>)?<\/Impression>/gi);
+    if (imp) imp.forEach(m => {
+      const u = m.replace(/<[^>]+>/g,'').replace(/<!\[CDATA\[|\]\]>/g,'').trim();
+      if (u.startsWith("http")) trackers.impression.push(u);
+    });
+  }
+
+  const total = Object.values(trackers).reduce((s,a) => s + a.length, 0);
+
+  // Парсим версию VAST
+  const vastVer = xml.match(/<VAST[^>]+version="([^"]+)"/)?.[1] || "unknown";
+  log(`VAST v${vastVer} | trackers: imp=${trackers.impression.length} events=${trackers.start.length+trackers.complete.length} error=${trackers.error.length} total=${total}`, 'info');
+  return trackers;
+}
+
+function pingTracker(urls, label) {
+  if (!urls || !urls.length) return;
+  urls.forEach(url => {
+    fetch(url, { method: "GET", mode: "no-cors", keepalive: true,
+      headers: { "User-Agent": MOBILE_UA } })
+      .catch(() => {});
+  });
+  log(`Tracker ping: ${label} (${urls.length})`, 'info');
+}
+
+function setupTrackingEvents(trackers, vid) {
+  if (!trackers) return;
+  let sentStart = false, sentQ1 = false, sentQ2 = false, sentQ3 = false;
+
+  const onTime = () => {
+    const pct = vid.currentTime / (vid.duration || 1);
+    if (!sentStart && pct >= 0.01) { sentStart = true; pingTracker(trackers.start, 'start'); }
+    if (!sentQ1    && pct >= 0.25) { sentQ1    = true; pingTracker(trackers.firstQuartile, '25%'); }
+    if (!sentQ2    && pct >= 0.50) { sentQ2    = true; pingTracker(trackers.midpoint, '50%'); }
+    if (!sentQ3    && pct >= 0.75) { sentQ3    = true; pingTracker(trackers.thirdQuartile, '75%'); }
+  };
+
+  const onEnded = () => {
+    pingTracker(trackers.complete, 'complete');
+    vid.removeEventListener("timeupdate", onTime);
+    vid.removeEventListener("ended", onEnded);
+  };
+
+  vid.addEventListener("timeupdate", onTime);
+  vid.addEventListener("ended", onEnded);
+}
+
+function extractClickThrough(xml) {
+  // 1. XML парсер — ищем все варианты тегов
+  try {
+    const doc = new DOMParser().parseFromString(xml, "text/xml");
+    for (const tag of ["ClickThrough", "ClickTracking", "NonLinearClickThrough"]) {
+      const el = doc.querySelector(tag);
+      if (el) {
+        const url = el.textContent.trim();
+        if (url.startsWith("http")) { log(`ClickThrough (${tag}): найден`, 'info'); return url; }
+      }
+    }
+  } catch(e) {}
+  // 2. Regex — CDATA
+  const m1 = xml.match(/<ClickThrough[^>]*>\s*<!\[CDATA\[\s*(https?:\/\/[^\]]+?)\s*\]\]>/si);
+  if (m1) return m1[1].trim();
+  // 3. Regex — plain
+  const m2 = xml.match(/<ClickThrough[^>]*>\s*(https?:\/\/[^<\s]+)\s*<\/ClickThrough>/si);
+  if (m2) return m2[1].trim();
+  // 4. Любой http в VideoClicks
+  const m3 = xml.match(/<VideoClicks>[\s\S]*?<ClickThrough[^>]*>[\s\S]*?(https?:\/\/[^\s<"]+)/i);
+  if (m3) return m3[1].trim();
+  log('ClickThrough: не найден в VAST', 'warn');
+  return null;
+}
+
+/* ============================================================
+   DEVICE ID POOL
+   ============================================================ */
+function loadPool() {
+  try { return JSON.parse(localStorage.getItem("vastPool") || "[]"); } catch(e) { return []; }
+}
+function savePool(pool) { localStorage.setItem("vastPool", JSON.stringify(pool)); }
+/* ============================================================
+   DEVICE CONTEXT — собираем всё что знаем об устройстве
+   Используется для fingerprint ID и обогащения VAST URL
+   ============================================================ */
+let deviceCtx = null; // заполняется один раз при старте
+
+async function buildDeviceContext() {
+  // Таймзоны РФ — распределение приближено к долям населения
+  const RU_TIMEZONES = [
+    ["Europe/Moscow",       52],  // Москва, ЦФО — самая populous
+    ["Europe/Moscow",       10],  // +дополнительный вес МСК
+    ["Europe/Samara",        5],  // Поволжье
+    ["Asia/Yekaterinburg",   8],  // Урал, Тюмень
+    ["Asia/Omsk",            3],  // Омск
+    ["Asia/Krasnoyarsk",     4],  // Красноярск, Хакасия
+    ["Asia/Irkutsk",         3],  // Иркутск, Бурятия
+    ["Asia/Yakutsk",         2],  // Якутия (часть)
+    ["Asia/Vladivostok",     3],  // Приморье, Хабаровск
+    ["Europe/Kaliningrad",   2],  // Калининград
+  ];
+  // Взвешенный случайный выбор таймзоны
+  function weightedTz() {
+    const raw = Intl.DateTimeFormat().resolvedOptions().timeZone;
+    // Если уже российская — оставляем как есть
+    if (raw.startsWith("Europe/Moscow") || raw.startsWith("Asia/Yekaterinburg") ||
+        raw.startsWith("Asia/Omsk") || raw.startsWith("Asia/Krasnoyarsk") ||
+        raw.startsWith("Asia/Irkutsk") || raw.startsWith("Asia/Yakutsk") ||
+        raw.startsWith("Asia/Vladivostok") || raw.startsWith("Europe/Kaliningrad") ||
+        raw.startsWith("Asia/Magadan") || raw.startsWith("Asia/Sakhalin") ||
+        raw.startsWith("Europe/Samara") || raw.startsWith("Asia/Anadyr")) {
+      return raw;
+    }
+    // Нероссийская — подменяем взвешенно
+    const total = RU_TIMEZONES.reduce((s, [,w]) => s + w, 0);
+    let r = Math.random() * total;
+    for (const [tz, w] of RU_TIMEZONES) { r -= w; if (r <= 0) return tz; }
+    return "Europe/Moscow";
+  }
+
+  // Языки — нормализуем к русскому если нероссийский
+  const RU_LANGS = ["ru-RU", "ru-RU", "ru-RU", "ru", "ru-RU,ru;q=0.9"];
+  function normalizeLang() {
+    const raw = navigator.language || "";
+    if (raw.startsWith("ru")) return raw; // уже русский
+    // Подменяем на ru-RU
+    return "ru-RU";
+  }
+
+  const tz    = weightedTz();
+  const lang  = normalizeLang();
+  const langs = lang.startsWith("ru")
+    ? (navigator.languages || [lang]).filter(l => l.startsWith("ru")).join(",") || "ru-RU,ru;q=0.9"
+    : "ru-RU,ru;q=0.9,en;q=0.8";
+  const sw    = screen.width, sh = screen.height;
+  const dpr   = Math.round((window.devicePixelRatio || 1) * 100) / 100;
+  const cores = navigator.hardwareConcurrency || 4;
+  const mem   = navigator.deviceMemory || 2;
+  const ua    = navigator.userAgent;
+  const conn  = navigator.connection?.effectiveType || "4g";
+  const touch = navigator.maxTouchPoints > 0 ? 1 : 0;
+
+  // Определяем тип ОС из UA
+  const isAndroid = /Android/.test(ua);
+  const isIOS     = /iPhone|iPad/.test(ua);
+  const osName    = isAndroid ? "Android" : isIOS ? "iOS" : "Unknown";
+  const osVer     = (ua.match(/Android ([\d.]+)/) || ua.match(/OS ([\d_]+)/) || ["",""])[1].replace(/_/g,".");
+
+  // Canvas fingerprint — лёгкий, без рендера
+  let canvasFp = "0";
+  try {
+    const c = document.createElement("canvas");
+    c.width = 64; c.height = 16;
+    const ctx2 = c.getContext("2d");
+    ctx2.font = "12px Arial"; ctx2.fillStyle = "#f60";
+    ctx2.fillText("CineGram", 2, 12);
+    canvasFp = c.toDataURL().slice(-20);
+  } catch(e) {}
+
+  return { tz, lang, langs, sw, sh, dpr, cores, mem, conn, touch, osName, osVer, canvasFp };
+}
+
+async function generateId() {
+  if (!deviceCtx) deviceCtx = await buildDeviceContext();
+  try {
+    const fp = [
+      MOBILE_UA,  // используем наш стабильный UA, не navigator.userAgent
+      deviceCtx.lang,
+      deviceCtx.sw + "x" + deviceCtx.sh,
+      screen.colorDepth,
+      deviceCtx.cores,
+      deviceCtx.mem,
+      deviceCtx.tz,
+      deviceCtx.canvasFp,
+      deviceCtx.dpr,
+    ].join("|");
+
+    const buf = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(fp));
+    const hex = Array.from(new Uint8Array(buf)).map(b => b.toString(16).padStart(2,"0")).join("");
+    const id  = "fp_" + hex.slice(0, 32);
+    log(`Device fingerprint: ...${id.slice(-8)} | ${deviceCtx.osName} ${deviceCtx.osVer} | ${deviceCtx.sw}x${deviceCtx.sh} | ${deviceCtx.conn}`, 'pool');
+    return id;
+  } catch(e) {
+    let stored = localStorage.getItem("vastDeviceId");
+    if (!stored) {
+      stored = "rnd_" + Math.random().toString(36).slice(2) + Math.random().toString(36).slice(2);
+      localStorage.setItem("vastDeviceId", stored);
+    }
+    return stored;
+  }
+}
+
+async function getActiveDevice() {
+  let pool = loadPool();
+  const now = Date.now();
+  if (pool.length > CONFIG.poolSize * 2) pool = pool.slice(-CONFIG.poolSize * 2);
+
+  // Если был принудительный device — вернуть именно его
+  if (forcedDeviceId) {
+    let forced = pool.find(d => d.id === forcedDeviceId);
+    if (!forced) { forced = { id: forcedDeviceId, plays: 0, cooldownUntil: 0 }; pool.unshift(forced); }
+    forcedDeviceId = null; // сбрасываем после первого использования
+    savePool(pool);
+    log(`Pool: используем принудительный ...${forced.id.slice(-6)}`, 'pool');
+    return forced;
+  }
+
+  let device = pool.find(d => d.plays < CONFIG.adsPerDevice && now >= (d.cooldownUntil || 0));
+  if (!device) {
+    let expired = pool.find(d => now >= (d.cooldownUntil || 0));
+    if (expired) {
+      log(`Pool: сброс cooldown для ...${expired.id.slice(-6)}`, 'pool');
+      expired.plays = 0; expired.cooldownUntil = 0; device = expired;
+    } else {
+      device = { id: await generateId(), plays: 0, cooldownUntil: 0 };
+      pool.push(device);
+      if (pool.length > CONFIG.poolSize * 2) pool.shift();
+      log(`Pool: новый ID ...${device.id.slice(-6)} (всего: ${pool.length})`, 'pool');
+    }
+  }
+  savePool(pool);
+  return device;
+}
+
+// Принудительно создаём новый device_id и запоминаем его
+let forcedDeviceId = null;
+async function forceNextDevice() {
+  const pool = loadPool();
+  const newDevice = { id: await generateId(), plays: 0, cooldownUntil: 0 };
+  pool.unshift(newDevice); // добавляем в начало чтобы getActiveDevice взял первым
+  if (pool.length > CONFIG.poolSize * 2) pool.pop();
+  savePool(pool);
+  forcedDeviceId = newDevice.id;
+  // Также меняем globalPlayIndex чтобы SSP дал другой ролик
+  globalPlayIndex = Math.floor(Math.random() * 1000);
+  localStorage.setItem("vastGlobalIndex", globalPlayIndex);
+  log(`Pool: новый ID ...${newDevice.id.slice(-6)}, новый index=${globalPlayIndex}`, 'pool');
+}
+
+function recordPlay(deviceId) {
+  const pool = loadPool();
+  const device = pool.find(d => d.id === deviceId);
+  if (device) {
+    device.plays = (device.plays || 0) + 1;
+    if (device.plays >= CONFIG.adsPerDevice) {
+      device.cooldownUntil = Date.now() + CONFIG.cooldownMs;
+      device.plays = 0;
+      log(`Pool: ...${deviceId.slice(-6)} → cooldown ${Math.round(CONFIG.cooldownMs/60000)}мин`, 'pool');
+    } else {
+      log(`Pool: ...${deviceId.slice(-6)} показов: ${device.plays}/${CONFIG.adsPerDevice}`, 'pool');
+    }
+    savePool(pool);
+  }
+}
+
+/* ============================================================
+   УТИЛИТЫ
+   ============================================================ */
+function hashCode(str) {
+  let hash = 0;
+  for (let i = 0; i < str.length; i++) { hash = (hash << 5) - hash + str.charCodeAt(i); hash |= 0; }
   return Math.abs(hash);
 }
+function showLoader(show) { show ? loader.classList.remove("hidden") : loader.classList.add("hidden"); }
+function bumpGlobalIndex() { globalPlayIndex++; localStorage.setItem("vastGlobalIndex", globalPlayIndex); }
 
-/* PLAYBACK STATE */
+/* ============================================================
+   VAST
+   ============================================================ */
+async function buildVastUrl(deviceId, playIndex) {
+  const groupSize   = 3;
+  const deviceGroup = hashCode(deviceId) % groupSize;
+  const segment     = Math.floor(playIndex / groupSize);
+  const shuffle     = Math.random() > 0.7 ? 1 : 0;
+  const cb          = Date.now() + Math.floor(Math.random() * 999999);
 
-let playCounter = 0;
+  // Собираем дополнительные сигналы из deviceCtx
+  const ctx   = deviceCtx || {};
+  const sw    = ctx.sw || screen.width;
+  const sh    = ctx.sh || screen.height;
+  const dpr   = ctx.dpr || window.devicePixelRatio || 2;
+  const lang  = encodeURIComponent(ctx.lang || "ru-RU");
+  const tz    = encodeURIComponent(ctx.tz  || "Europe/Moscow");
+  const osName = encodeURIComponent(ctx.osName || "Android");
+  const osVer  = encodeURIComponent(ctx.osVer  || "13");
 
-/* VAST URL */
+  // Размер плеера — fullscreen
+  const pw = window.innerWidth  || sw;
+  const ph = window.innerHeight || sh;
 
-function buildVastUrl(){
+  // Живая вариативность — меняется при каждом запросе как у реального пользователя
+  // Тип соединения: реальный если доступен, иначе естественное чередование wifi/4g
+  const connTypes = ["4g", "4g", "4g", "wifi", "wifi", "3g"]; // веса: 4g чаще всего
+  const liveConn = navigator.connection?.effectiveType
+    || connTypes[Math.floor(Math.random() * connTypes.length)];
 
-  const device = getDevice();
+  // cb с человеческой вариацией — не точный timestamp, а с погрешностью 0.5–4с назад
+  const humanCb = Date.now() - Math.floor(Math.random() * 3500 + 500);
 
-  const groupSize = 3;
-  const deviceGroup = hashCode(device) % groupSize;
+  // Батарея — если API доступен, иначе реалистичный диапазон (30–95%)
+  let batteryLevel = null;
+  try {
+    const bat = await navigator.getBattery?.();
+    if (bat) batteryLevel = Math.round(bat.level * 100);
+  } catch(e) {}
+  const battery = batteryLevel ?? (30 + Math.floor(Math.random() * 65));
 
-  const segment = Math.floor(playCounter / groupSize);
+  const params = new URLSearchParams({
+    // Базовые параметры SSP
+    ad_place_type:    "preroll",
+    age_value:        "18",
+    broadcast_type:   "ott",
+    client_id:        deviceId,
+    domain:           "t.me",
+    embedded:         "P5",
+    is_child:         "false",
+    is_paid:          "0",
+    location:         "100001",
+    san:              "web_vast_code",
+    ad_position:      "1",
+    content_id:       "23080",
+    device_type:      "MOBILE",        // было NCWEB → повышает ставки
+    web_client_type:  "mobile",
+    segment:          segment,
+    group:            deviceGroup,
+    shuffle:          shuffle,
+    play_index:       playIndex,
+    cb:               humanCb,
 
-  const shuffle = Math.random() > 0.7 ? 1 : 0;
+    // Размер плеера — важен для Viewability
+    player_width:     pw,
+    player_height:    ph,
 
-  const cb = Date.now() + Math.floor(Math.random()*999999);
+    // Устройство
+    screen_width:     sw,
+    screen_height:    sh,
+    dpr:              dpr,
+    os:               osName,
+    os_version:       osVer,
+    connection_type:  liveConn,
+    battery:          battery,
 
-  return `https://ssp.wink.ru/v1/rt/avod/vast?ad_place_type=preroll&age_value=18&broadcast_type=ott&client_id=${device}&domain=t.me&embedded=P5&is_child=false&is_paid=0&location=100001&san=web_vast_code&ad_position=1&content_id=23080&device_type=NCWEB&web_client_type=mobile&segment=${segment}&group=${deviceGroup}&shuffle=${shuffle}&play_index=${playCounter}&cb=${cb}`;
+    // Локаль
+    language:         lang,
+    timezone:         tz,
+
+    // IAB signals
+    gdpr:             "0",             // РФ трафик — не под GDPR
+    coppa:            "0",             // не детский контент
+    ua:               encodeURIComponent(MOBILE_UA),
+  });
+
+  return `https://ssp.wink.ru/v1/rt/avod/vast?${params.toString()}`;
 }
 
-/* FETCH */
+// UA реального мобильного Chrome — повышает доверие SSP и ставки
+const MOBILE_UA = "Mozilla/5.0 (Linux; Android 13; Pixel 7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Mobile Safari/537.36";
 
-async function fetchText(url){
-  return await (await fetch(url)).text();
+async function fetchWithTimeout(url, timeoutMs) {
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), timeoutMs);
+  try {
+    // Минимальные заголовки — только безопасные для iOS WebKit
+    // User-Agent через заголовок блокируется WebView на iOS (политика WebKit)
+    // UA передаётся в параметре VAST URL, не в заголовке
+    const res = await fetch(url, {
+      signal: controller.signal,
+      headers: {
+        "Accept": "application/xml, text/xml, */*;q=0.9",
+        "Accept-Language": "ru-RU,ru;q=0.9",
+      }
+    });
+    clearTimeout(timer);
+    return await res.text();
+  } catch(e) { clearTimeout(timer); throw e; }
 }
 
-/* WRAPPER RESOLVE */
+async function resolveVast(url, depth = 0, parentXml = '') {
+  if (depth > 5) throw new Error("VAST wrapper depth exceeded");
+  log(`VAST fetch [depth=${depth}]: ${url.slice(0,80)}...`, 'vast');
+  const xml = await fetchWithTimeout(url, CONFIG.fetchTimeoutMs);
+  log(`VAST ответ: ${xml.length} байт | preview: ${xml.slice(0,120).replace(/\s+/g,' ')}`, 'vast');
 
-async function resolveVast(url){
-
-  let xml = await fetchText(url);
-
-  let wrapper = xml.match(/<VASTAdTagURI><!\[CDATA\[(.*?)\]\]>/);
-
-  if(wrapper){
-    return resolveVast(wrapper[1].trim());
+  // Детектируем No-Fill явно — SSP вернул пустой VAST без <Ad>
+  const hasAd = xml.includes('<Ad ') || xml.includes('<Ad>');
+  if (!hasAd && xml.includes('<VAST')) {
+    log(`VAST No-Fill (пустой ответ без <Ad>) — SSP не дал рекламу`, 'warn');
+    return xml; // возвращаем пустой — extractMedia вернёт null
+  }
+  if (xml.length < 50) {
+    log(`VAST слишком короткий (${xml.length} байт) — возможно ошибка сети`, 'warn');
   }
 
-  return xml;
+  const wrapper = xml.match(/<VASTAdTagURI><!\[CDATA\[([\s\S]*?)\]\]>/);
+  if (wrapper) {
+    log(`VAST wrapper → цепочка`, 'vast');
+    // Сохраняем родительский XML — в нём может быть ClickThrough
+    return resolveVast(wrapper[1].trim(), depth + 1, parentXml + xml);
+  }
+  // Мержим дочерний + родительские XML чтобы не потерять ClickThrough
+  const merged = xml + parentXml;
+  const hasMedia = merged.includes('MediaFile') || merged.includes('.mp4');
+  log(`VAST разобран. MediaFile: ${hasMedia ? 'найден ✓' : 'НЕ найден ✗'}`, hasMedia ? 'vast' : 'warn');
+  return merged;
 }
 
-/* MEDIA EXTRACT */
+function extractMedia(xml) {
+  // Фильтруем только реальные видеофайлы — пропускаем VPAID (.js, apiFramework="VPAID")
+  try {
+    const doc    = new DOMParser().parseFromString(xml, "text/xml");
+    const mediaFiles = Array.from(doc.querySelectorAll("MediaFile"));
 
-function extractMedia(xml){
-
-  try{
-    let doc = new DOMParser().parseFromString(xml,"text/xml");
-    let media = doc.querySelector("MediaFile");
-    if(media) return media.textContent.trim();
-  }catch(e){}
-
-  let match = xml.match(/https:\/\/[^ ]+\.mp4/);
-
-  return match ? match[0] : null;
-}
-
-/* SKIP */
-
-let skipTimer;
-
-function startSkipCountdown(){
-
-  skipBtn.style.display="none";
-
-  if(skipTimer) clearTimeout(skipTimer);
-
-  skipTimer = setTimeout(()=>{
-    skipBtn.style.display="block";
-  },5000);
-}
-
-/* PLAYER */
-
-async function startAd(){
-
-  try{
-
-    status.innerText="requesting ad...";
-
-    const vastUrl = buildVastUrl();
-
-    let xml = await resolveVast(vastUrl);
-
-    const media = extractMedia(xml);
-
-    if(!media){
-
-      status.innerText="no ad";
-
-      setTimeout(()=>{
-        playCounter++;
-        startAd();
-      },2000);
-
-      return;
+    // Сначала ищем mp4/webm без VPAID
+    for (const m of mediaFiles) {
+      const api  = (m.getAttribute("apiFramework") || "").toUpperCase();
+      const type = (m.getAttribute("type") || "").toLowerCase();
+      const url  = m.textContent.trim();
+      if (api === "VPAID") { log(`Пропуск VPAID: ${url.slice(0,50)}`, 'warn'); statsVpaid++; continue; }
+      if (url.match(/\.(js|swf)(\?|$)/i)) { log(`Пропуск non-video: ${url.slice(0,50)}`, 'warn'); continue; }
+      if (url.match(/\.(mp4|webm|m3u8)(\?|$)/i) || type.includes("mp4") || type.includes("webm")) {
+        log(`Media URL: ${url.slice(0,70)}...`, 'ok');
+        return url;
+      }
     }
 
-    status.innerText="playing ad";
+    // Если строгий фильтр ничего не нашёл — берём любой не-VPAID MediaFile
+    for (const m of mediaFiles) {
+      const api = (m.getAttribute("apiFramework") || "").toUpperCase();
+      const url = m.textContent.trim();
+      if (api === "VPAID" || url.match(/\.(js|swf)(\?|$)/i)) continue;
+      if (url.startsWith("http")) { log(`Media URL (fallback): ${url.slice(0,70)}...`, 'ok'); return url; }
+    }
+  } catch(e) { log(`Ошибка парсинга XML: ${e.message}`, 'warn'); }
 
-    video.src = media;
-    await video.play();
+  // Последний шанс — regex только для mp4
+  const match = xml.match(/https?:\/\/[^\s"<>]+\.mp4[^\s"<>]*/i);
+  if (match) { log(`Media URL (regex mp4): ${match[0].slice(0,70)}...`, 'ok'); return match[0]; }
+  return null;
+}
 
-    startSkipCountdown();
+/* ============================================================
+   SKIP
+   ============================================================ */
+let skipTimer = null;
 
-    playCounter++;
+function resetSkip() {
+  skipBtn.style.display = "none";
+  if (skipTimer) clearTimeout(skipTimer);
+}
 
-  }catch(e){
+function startSkipCountdown() {
+  resetSkip();
+  skipTimer = setTimeout(() => {
+    skipBtn.style.display = "flex";
+    log('Кнопка пропуска показана', 'debug');
+  }, CONFIG.skipDelaySec * 1000);
+}
 
-    console.error(e);
+/* ============================================================
+   PRELOAD — предзагружаем следующий VAST пока играет текущий
+   ============================================================ */
+let preloadCache = null; // { mediaUrl, clickUrl, xml }
 
-    status.innerText="error";
-
-    setTimeout(startAd,3000);
+async function preloadNext() {
+  try {
+    const device  = await getActiveDevice();
+    const nextIdx = globalPlayIndex + 1;
+    const vastUrl = await buildVastUrl(device.id, nextIdx);
+    const xml     = await resolveVast(vastUrl);
+    const mediaUrl = extractMedia(xml);
+    const clickUrl = extractClickThrough(xml);
+    const trackers = extractTrackers(xml);
+    if (mediaUrl) {
+      preloadCache = { mediaUrl, clickUrl, trackers };
+      log(`Preload: следующий ролик готов`, 'info');
+    }
+  } catch(e) {
+    preloadCache = null;
   }
 }
 
-/* EVENTS */
+/* ============================================================
+   ОСНОВНОЙ ЦИКЛ
+   ============================================================ */
+let currentSession = 0;
 
-video.addEventListener("ended",()=>{
-  status.innerText="ad finished";
+async function startAd() {
+  const mySession  = ++currentSession;
+  currentSessionId = mySession;
+
+  log(`=== Сессия #${mySession} | globalIndex=${globalPlayIndex} ===`, 'info');
+
+  resetSkip();
+  setClickUrl(null);
+  showLoader(true);
+  video.pause();
+  video.removeAttribute("src");
+  video.load();
+
+  // Человеческая задержка перед запросом (300–1200мс) — антифрод сигнал
+  const humanDelay = 300 + Math.floor(Math.random() * 900);
+  await delay(humanDelay);
+  if (mySession !== currentSession) return;
+
+  const device    = await getActiveDevice();
+  currentDeviceId = device.id;
+
+  log(`Device: ...${device.id.slice(-6)}, plays=${device.plays}`, 'info');
+
+  statsAttempts++;
+
+  for (let attempt = 1; attempt <= CONFIG.maxRetries; attempt++) {
+    if (mySession !== currentSession) { log(`Сессия #${mySession} отменена`, 'debug'); return; }
+
+    log(`Попытка ${attempt}/${CONFIG.maxRetries}`, 'info');
+
+    try {
+      let mediaUrl, clickUrl;
+
+      // Используем предзагруженный VAST если есть
+      if (preloadCache) {
+        ({ mediaUrl, clickUrl } = preloadCache);
+        currentTrackers = preloadCache.trackers || null;
+        preloadCache = null;
+        log(`Используем preload-кэш`, 'info');
+      } else {
+        const vastUrl = await buildVastUrl(device.id, globalPlayIndex);
+        const xml     = await resolveVast(vastUrl);
+        if (mySession !== currentSession) return;
+        mediaUrl = extractMedia(xml);
+        clickUrl = extractClickThrough(xml);
+        currentTrackers = extractTrackers(xml);
+      }
+
+      if (!mediaUrl) {
+        // При no-fill меняем play_index — запрашиваем другой креатив из пула SSP
+        globalPlayIndex = (globalPlayIndex + Math.floor(Math.random() * 7 + 1)) % 10000;
+        localStorage.setItem('vastGlobalIndex', globalPlayIndex);
+        log(`Попытка ${attempt}: нет медиа → новый index=${globalPlayIndex}, пауза ${CONFIG.noAdRetryMs}мс`, 'warn');
+        await delay(CONFIG.noAdRetryMs);
+        continue;
+      }
+
+      log(`Загрузка видео...`, 'info');
+      adStartTime = Date.now();
+      video.src   = mediaUrl;
+      video.muted = isMuted;
+      video.load();
+
+      await new Promise((resolve, reject) => {
+        const onReady = () => { cleanup(); log('canplay ✓', 'ok'); resolve(); };
+        const onError = () => { cleanup(); reject(new Error(`video error code=${video.error?.code}`)); };
+        const onAbort = () => { cleanup(); reject(new Error("video aborted")); };
+        const timer   = setTimeout(() => { cleanup(); reject(new Error("video load timeout 10s")); }, 10000);
+        const cleanup = () => {
+          clearTimeout(timer);
+          video.removeEventListener("canplay", onReady);
+          video.removeEventListener("error",   onError);
+          video.removeEventListener("abort",   onAbort);
+        };
+        video.addEventListener("canplay", onReady);
+        video.addEventListener("error",   onError);
+        video.addEventListener("abort",   onAbort);
+      });
+
+      if (mySession !== currentSession) return;
+
+      positionControls();
+      showLoader(false);
+      setClickUrl(clickUrl);
+
+      try {
+        await video.play();
+        log('play() ✓', 'ok');
+      } catch(playErr) {
+        log(`play() заблокирован → muted`, 'warn');
+        video.muted = true; isMuted = true;
+        muteBtn.textContent = '🔇';
+        muteBtn.classList.add('muted');
+        await video.play();
+        log('play() muted ✓', 'ok');
+      }
+
+      startSkipCountdown();
+      recordPlay(device.id);
+      bumpGlobalIndex();
+      statsSuccess++;
+      // VAST tracking — Impression + quartile events
+      pingTracker(currentTrackers?.impression, 'impression');
+      setupTrackingEvents(currentTrackers, video);
+      log(`Ролик запущен ✓ globalIndex → ${globalPlayIndex}`, 'ok');
+      // Выводим статистику каждые 5 успешных показов
+      if (statsSuccess % 5 === 0) logStats();
+      // Предзагружаем следующий VAST пока играет текущий
+      setTimeout(() => preloadNext(), 2000);
+      return;
+
+    } catch(e) {
+      if (mySession !== currentSession) return;
+      let msg = e.message || "unknown error";
+      if (e.name === "AbortError") msg = "таймаут запроса";
+      else if (msg === "Load failed") msg = "Load failed (iOS WebKit CORS/сеть)";
+      else if (msg === "Failed to fetch") msg = "Failed to fetch (CORS/сеть)";
+      log(`ОШИБКА попытки ${attempt}: ${msg}`, 'error');
+      await delay(CONFIG.retryDelayMs * attempt);
+    }
+  }
+
+  if (mySession !== currentSession) return;
+  statsFail++;
+  log(`Все попытки провалились → смена device + пауза 3с`, 'error');
+  // Пингуем Error трекер — IAB стандарт, SSP ожидает этот сигнал при провале
+  pingTracker(currentTrackers?.error?.map(u => u.replace("[ERRORCODE]", "900")), 'error:900');
+  logStats();
+  // Принудительно переключаем device_id чтобы получить другую рекламу
+  await forceNextDevice();
+  showLoader(false);
+  await delay(3000);
+  startAd();
+}
+
+function delay(ms) { return new Promise(resolve => setTimeout(resolve, ms)); }
+
+/* ============================================================
+   СОБЫТИЯ ВИДЕО
+   ============================================================ */
+video.addEventListener("ended", () => {
+  log('Видео завершено', 'ok');
+  resetSkip(); setClickUrl(null);
   startAd();
 });
+video.addEventListener("error", () => {
+  if (!video.src || video.src === window.location.href) return;
+  log(`video.error: code=${video.error?.code}`, 'warn');
+});
+video.addEventListener("waiting", () => log('Буферизация...', 'debug'));
+video.addEventListener("stalled", () => log('Зависание потока (stalled)', 'warn'));
+let adStartTime = 0; // фиксируем когда начали загрузку
+video.addEventListener("playing", () => {
+  const ttff = adStartTime ? Math.round(Date.now() - adStartTime) : 0;
+  log(`Воспроизведение (playing) | TTFF: ${ttff}мс`, ttff > 3000 ? 'warn' : 'ok');
+});
 
-/* Skip */
-
-skipBtn.onclick=()=>{
-  video.pause();
-  startAd();
+skipBtn.onclick = () => {
+  log('Skip', 'info');
+  pingTracker(currentTrackers?.skip, 'skip');
+  pingTracker(currentTrackers?.clickTracking, 'clickTracking');
+  resetSkip(); setClickUrl(null); startAd();
 };
 
-/* Close → Telegram WebApp safe exit */
-
-closeBtn.onclick=()=>{
-
+closeBtn.onclick = () => {
+  log('Закрытие плеера', 'info');
   video.pause();
-
-  if(document.fullscreenElement){
-    document.exitFullscreen();
-  }
-
-  if(window.Telegram?.WebApp){
-    window.Telegram.WebApp.close();
-  }else{
-    window.location.href="index.html";
-  }
+  if (window.Telegram?.WebApp) window.Telegram.WebApp.close();
+  else window.location.href = "index.html";
 };
 
-/* AUTO START */
+/* ============================================================
+   СТАРТ
+   ============================================================ */
+log('Плеер запущен', 'ok');
+
+// Принудительный поворот в ландшафт при запуске плеера
+(async () => {
+  const tgApp = window.Telegram?.WebApp;
+  let locked = false;
+
+  try {
+    await screen.orientation.lock("landscape");
+    log('Ориентация: landscape locked ✓', 'ok');
+    locked = true;
+  } catch(e) {}
+
+  if (!locked) {
+    try {
+      tgApp?.lockOrientation?.();
+      await new Promise(r => setTimeout(r, 500));
+      const isLandscape = window.innerWidth > window.innerHeight;
+      log('Ориентация: tg.lockOrientation → ' + (isLandscape ? 'landscape ✓' : 'portrait (iOS игнорирует)'), isLandscape ? 'ok' : 'warn');
+      locked = isLandscape;
+    } catch(e) {}
+  }
+
+  if (!locked && window.innerWidth <= window.innerHeight) {
+    log('Ориентация: iOS блокирует autorotate — показываем подсказку', 'warn');
+    const hint = document.createElement('div');
+    hint.id = 'rotateHint';
+    hint.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,.88);z-index:9999;display:flex;flex-direction:column;align-items:center;justify-content:center;color:#fff;font-size:18px;text-align:center;padding:24px;';
+    hint.innerHTML = '<div style="font-size:52px;margin-bottom:16px">&#128241;&#10145;&#65039;</div><div style="font-weight:600;margin-bottom:8px">Поверните устройство</div><div style="opacity:.7;font-size:15px">для просмотра рекламы</div>';
+    document.body.appendChild(hint);
+    const onOrient = () => {
+      if (window.innerWidth > window.innerHeight) { hint.remove(); window.removeEventListener('resize', onOrient); }
+    };
+    window.addEventListener('resize', onOrient);
+  }
+})();
+
+// Инициализируем device context заранее — до первого VAST запроса
+buildDeviceContext().then(ctx => { deviceCtx = ctx; log(`OS: ${ctx.osName} ${ctx.osVer} | ${ctx.sw}x${ctx.sh} | net: ${ctx.conn}`, 'info'); });
+log(`Config: adsPerDevice=${CONFIG.adsPerDevice}, cooldown=${CONFIG.cooldownMs/60000}мин, poolSize=${CONFIG.poolSize}`, 'debug');
+log(`Sheets: ${CONFIG.sheetsEnabled ? 'включён ✓' : 'выключен'}`, 'info');
+log(`UA: ${MOBILE_UA.slice(0, 60)}...`, 'info');
+
+// Проверка размера плеера
+// KPI 540×360 — для десктоп. На мобильном fullscreen TMA всегда валиден.
+const pw = window.innerWidth, ph = window.innerHeight;
+// Мобильный fullscreen: меньшая сторона ≥ 360px достаточно
+const isMobileFullscreen = Math.min(pw, ph) >= 360;
+const sizeOk = (pw >= CONFIG.minPlayerW && ph >= CONFIG.minPlayerH) || isMobileFullscreen;
+log(`Размер плеера: ${pw}×${ph} px — ${sizeOk ? '✓ OK' : '✗ НИЖЕ KPI'}`, sizeOk ? 'ok' : 'warn');
+
+// Viewability — Intersection Observer
+const observer = new IntersectionObserver(entries => {
+  const ratio = entries[0]?.intersectionRatio ?? 1;
+  if (ratio < 0.5) log(`Viewability: плеер вышел из зоны видимости (${Math.round(ratio*100)}%)`, 'warn');
+}, { threshold: [0, 0.5, 1.0] });
+observer.observe(document.getElementById("playerWrapper"));
+log(`globalPlayIndex: ${globalPlayIndex}`, 'debug');
+
+// Снимаем блокировку ориентации при выходе из плеера
+window.addEventListener("pagehide", () => {
+  try { screen.orientation.unlock(); } catch(e) {}
+  try { window.Telegram?.WebApp?.unlockOrientation?.(); } catch(e) {}
+});
 
 startAd();
 
 </script>
-
 </body>
 </html>
