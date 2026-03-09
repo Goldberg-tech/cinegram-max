@@ -64,5 +64,5 @@ window.addEventListener("DOMContentLoaded", () => {
   renderRow("biography", movies.biography);
   renderRow("scifi",     movies.scifi);
   renderRow("cartoon",   movies.cartoon);
-  renderRow("ani",     movies.anime);
+  renderRow("anime",     movies.anime);
 });
