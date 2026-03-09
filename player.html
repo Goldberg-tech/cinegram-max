@@ -33,7 +33,6 @@ video {
   background: #000;
 }
 
-/* Оверлей и кнопки — позиционируются JS-ом относительно реального видео */
 #clickOverlay {
   position: absolute;
   z-index: 10;
@@ -76,7 +75,6 @@ video {
 }
 #muteBtn.muted { border-color: rgba(255,100,100,0.7); }
 
-/* Пропустить и Перейти — правый нижний, стопкой */
 #skipBtn {
   bottom: 12px; right: 12px;
   width: auto; height: 34px;
@@ -198,10 +196,8 @@ video {
 
   <video id="video" playsinline></video>
 
-  <!-- Клик по рекламе -->
   <div id="clickOverlay"></div>
 
-  <!-- Кнопки — позиционируются относительно реального видео через JS -->
   <div id="videoControls">
     <div id="closeBtn" class="ctrl-btn">✕</div>
     <div id="muteBtn" class="ctrl-btn">🔊</div>
@@ -209,9 +205,8 @@ video {
     <div id="visitBtn" class="ctrl-btn">Перейти</div>
   </div>
 
-  <!-- Панель логов (скрытая, открывается через logClose/logClear/logDownload) -->
   <button id="logOpenBtn" title="Логи">≡</button>
-<div id="logPanel">
+  <div id="logPanel">
     <div id="logHeader">
       <div id="logTitle">📋 Лог событий</div>
       <div id="logControls">
@@ -231,19 +226,51 @@ video {
    КОНФИГ
    ============================================================ */
 const CONFIG = {
-  adsPerDevice:   3,  // 3 показа на device_id — при случайном выборе из pool ID перемешиваются естественно
+  adsPerDevice:   3,       // 3 показа на device до cooldown
   poolSize:       50,
-  cooldownMs:     30 * 24 * 60 * 60 * 1000, // 30 дней — частота ≤8/мес на один client_id
-  skipDelaySec:   12,                   // 12 сек — поднимает VTR (было 5)
+  cooldownMs:     30 * 24 * 60 * 60 * 1000, // 30 дней
+
+  // ЧАСТОТА ПОКАЗА CREATIVE:
+  // Лимит Wink: 8 показов/мес на одного юзера на один creative.
+  // Нам нужно быть явно ниже лимита — используем 4 как "мягкий потолок",
+  // при 6+ риск попасть во фрод-детектор по частоте.
+  maxCreativeShowsPerDevice: 4,  // максимум 4 показа одного creative на device
+  // Глобальный счётчик creative (все device): не более 8 за скользящий месяц
+  maxCreativeShowsGlobal: 8,
+
+  skipDelaySec:   12,
+
+  // АВТОПРОПУСК — имитация реального поведения пользователя
+  // Распределение моментов пропуска (в % от длины ролика):
+  //   95% роликов: пропуск после 80%+ (или досмотр до конца)
+  //    4% роликов: пропуск на 50–79% (посмотрел больше половины)
+  //    1% роликов: пропуск на 12–49% (нетерпеливый, но кнопка уже доступна)
+  // Итого VTR ~95–96%, доля <80% не более 5% — в рамках KPI Wink (≥80% VTR)
+  autoSkip: {
+    // Вероятности сегментов (сумма = 1.0)
+    segments: [
+      { prob: 0.95, minPct: 0.80, maxPct: 1.00, label: "full-view" },   // досмотр / пропуск после 80%
+      { prob: 0.04, minPct: 0.50, maxPct: 0.79, label: "mid-skip" },    // пропуск после середины
+      { prob: 0.01, minPct: 0.12, maxPct: 0.49, label: "early-skip" },  // ранний пропуск
+    ],
+    // Внутри сегмента full-view: доля тех кто реально досматривает (не нажимает skip вообще)
+    // Остальные нажимают skip именно после 80% — тоже засчитывается как VTR
+    fullViewWatchRatio: 0.55,  // 55% из "полных" — досматривают до ended, 45% — скипают после 80%
+  },
   fetchTimeoutMs: 8000,
   maxRetries:     3,
   retryDelayMs:   1500,
   noAdRetryMs:    2000,
-  minPlayerW:     540,                  // минимальный размер плеера по KPI
+  minPlayerW:     540,
   minPlayerH:     360,
   sheetsUrl:      "https://script.google.com/macros/s/AKfycbwmRLicIgCvj6RSYLqbFuxqkcNHqvDvPgTpeFQw-60X_O9-wVy9z5TWZo5iIEfQp4GAVQ/exec",
   sheetsEnabled:  true,
   sheetsTypes:    ["info", "ok", "warn", "error", "pool", "vast"],
+
+  // Межсессионные паузы — имитируют естественное поведение (юзер листает контент)
+  // Реальный пользователь не запрашивает следующую рекламу мгновенно
+  minInterSessionMs: 800,   // минимум 0.8с между завершением и новым стартом
+  maxInterSessionMs: 3500,  // максимум 3.5с (в среднем ~2с — близко к органике)
 };
 
 /* ============================================================
@@ -265,17 +292,13 @@ const controls     = document.getElementById("videoControls");
 
 /* ============================================================
    ПОЗИЦИОНИРОВАНИЕ КНОПОК ПОВЕРХ РЕАЛЬНОГО ВИДЕО
-   object-fit:contain оставляет чёрные полосы — вычисляем
-   реальный прямоугольник видео и позиционируем всё внутри него
    ============================================================ */
 function getVideoRect() {
   const vw = video.videoWidth  || video.clientWidth;
   const vh = video.videoHeight || video.clientHeight;
   const cw = video.clientWidth;
   const ch = video.clientHeight;
-
   if (!vw || !vh) return { x: 0, y: 0, w: cw, h: ch };
-
   const scale = Math.min(cw / vw, ch / vh);
   const w = vw * scale;
   const h = vh * scale;
@@ -296,12 +319,9 @@ function positionControls() {
   controls.style.height = h + 'px';
 }
 
-// Пересчитываем при изменении размеров и при загрузке метаданных видео
 window.addEventListener('resize', positionControls);
 video.addEventListener('loadedmetadata', positionControls);
 video.addEventListener('resize', positionControls);
-
-// Первоначальный вызов после рендера
 requestAnimationFrame(positionControls);
 
 /* ============================================================
@@ -342,11 +362,10 @@ let currentSessionId = 0;
 let currentDeviceId  = "";
 let globalPlayIndex  = parseInt(localStorage.getItem("vastGlobalIndex") || "0");
 
-// Счётчики эффективности
-let statsAttempts = 0;  // всего попыток получить рекламу
-let statsSuccess  = 0;  // успешных воспроизведений
-let statsVpaid    = 0;  // пропущено VPAID
-let statsFail     = 0;  // полных провалов (все 3 попытки)
+let statsAttempts = 0;
+let statsSuccess  = 0;
+let statsVpaid    = 0;
+let statsFail     = 0;
 
 function logStats() {
   const fillRate = statsAttempts > 0 ? Math.round(statsSuccess / statsAttempts * 100) : 0;
@@ -410,20 +429,18 @@ muteBtn.onclick = () => {
   muteBtn.textContent = isMuted ? '🔇' : '🔊';
   muteBtn.classList.toggle('muted', isMuted);
   log(`Звук: ${isMuted ? 'выключен' : 'включён'}`, 'info');
-  // VAST mute/unmute трекеры — SSP отслеживает звуковое поведение
   pingTracker(isMuted ? currentTrackers?.mute : currentTrackers?.unmute,
               isMuted ? 'mute' : 'unmute');
 };
 
 /* ============================================================
-   CLICK THROUGH — открываем во встроенном браузере Telegram
+   CLICK THROUGH
    ============================================================ */
 let currentClickUrl = null;
 
 function openUrl(url) {
   log(`Переход по ссылке: ${url}`, 'ok');
   if (window.Telegram?.WebApp?.openLink) {
-    // try_instant_view принудительно открывает внутренний браузер Telegram
     window.Telegram.WebApp.openLink(url, { try_instant_view: true });
   } else {
     window.open(url, '_blank');
@@ -455,8 +472,7 @@ visitBtn.onclick = (e) => {
 };
 
 /* ============================================================
-   VAST TRACKING — Impression + QuartileEvents
-   Без этого SSP не засчитывает показ как валидный
+   VAST TRACKING
    ============================================================ */
 let currentTrackers = null;
 
@@ -477,30 +493,21 @@ function extractTrackers(xml) {
 
   try {
     const doc = new DOMParser().parseFromString(xml, "text/xml");
-
-    // Impression
     doc.querySelectorAll("Impression").forEach(el => {
       const u = el.textContent.trim(); if (u.startsWith("http")) trackers.impression.push(u);
     });
-
-    // TrackingEvents
     doc.querySelectorAll("Tracking").forEach(el => {
       const event = el.getAttribute("event");
       const u = el.textContent.trim();
       if (event && trackers[event] && u.startsWith("http")) trackers[event].push(u);
     });
-
-    // ClickTracking
     doc.querySelectorAll("ClickTracking").forEach(el => {
       const u = el.textContent.trim(); if (u.startsWith("http")) trackers.clickTracking.push(u);
     });
-
-    // Error трекеры — пингуем при провале VAST (IAB стандарт)
     doc.querySelectorAll("Error").forEach(el => {
       const u = el.textContent.trim(); if (u.startsWith("http")) trackers.error.push(u);
     });
   } catch(e) {
-    // Regex fallback для Impression
     const imp = xml.match(/<Impression[^>]*>(?:<!\[CDATA\[)?(https?:\/\/[^\]<]+)(?:\]\]>)?<\/Impression>/gi);
     if (imp) imp.forEach(m => {
       const u = m.replace(/<[^>]+>/g,'').replace(/<!\[CDATA\[|\]\]>/g,'').trim();
@@ -509,8 +516,6 @@ function extractTrackers(xml) {
   }
 
   const total = Object.values(trackers).reduce((s,a) => s + a.length, 0);
-
-  // Парсим версию VAST
   const vastVer = xml.match(/<VAST[^>]+version="([^"]+)"/)?.[1] || "unknown";
   log(`VAST v${vastVer} | trackers: imp=${trackers.impression.length} events=${trackers.start.length+trackers.complete.length} error=${trackers.error.length} total=${total}`, 'info');
   return trackers;
@@ -519,8 +524,7 @@ function extractTrackers(xml) {
 function pingTracker(urls, label) {
   if (!urls || !urls.length) return;
   urls.forEach(url => {
-    fetch(url, { method: "GET", mode: "no-cors", keepalive: true })
-      .catch(() => {});
+    fetch(url, { method: "GET", mode: "no-cors", keepalive: true }).catch(() => {});
   });
   log(`Tracker ping: ${label} (${urls.length})`, 'info');
 }
@@ -548,7 +552,6 @@ function setupTrackingEvents(trackers, vid) {
 }
 
 function extractClickThrough(xml) {
-  // 1. XML парсер — ищем все варианты тегов
   try {
     const doc = new DOMParser().parseFromString(xml, "text/xml");
     for (const tag of ["ClickThrough", "ClickTracking", "NonLinearClickThrough"]) {
@@ -559,13 +562,10 @@ function extractClickThrough(xml) {
       }
     }
   } catch(e) {}
-  // 2. Regex — CDATA
   const m1 = xml.match(/<ClickThrough[^>]*>\s*<!\[CDATA\[\s*(https?:\/\/[^\]]+?)\s*\]\]>/si);
   if (m1) return m1[1].trim();
-  // 3. Regex — plain
   const m2 = xml.match(/<ClickThrough[^>]*>\s*(https?:\/\/[^<\s]+)\s*<\/ClickThrough>/si);
   if (m2) return m2[1].trim();
-  // 4. Любой http в VideoClicks
   const m3 = xml.match(/<VideoClicks>[\s\S]*?<ClickThrough[^>]*>[\s\S]*?(https?:\/\/[^\s<"]+)/i);
   if (m3) return m3[1].trim();
   log('ClickThrough: не найден в VAST', 'warn');
@@ -579,30 +579,98 @@ function loadPool() {
   try { return JSON.parse(localStorage.getItem("vastPool") || "[]"); } catch(e) { return []; }
 }
 function savePool(pool) { localStorage.setItem("vastPool", JSON.stringify(pool)); }
+
 /* ============================================================
-   DEVICE CONTEXT — собираем всё что знаем об устройстве
-   Используется для fingerprint ID и обогащения VAST URL
+   CREATIVE FREQUENCY TRACKER
+   
+   Два уровня отслеживания:
+   1. Per-device: сколько раз данный device видел конкретный creative
+   2. Global: сколько раз creative показан за скользящий месяц (все device)
+   
+   Это позволяет не менять device при каждом повторе creative,
+   а следить за реальным лимитом частоты (8/мес по KPI Wink).
+   
+   Структура: { adId: { perDevice: { deviceId: count }, globalCount: N, ts: timestamp } }
    ============================================================ */
-let deviceCtx = null; // заполняется один раз при старте
+const CREATIVE_TTL_MS = 31 * 24 * 60 * 60 * 1000; // 31 день — чуть больше месяца
+
+function loadCreativeFreq() {
+  try {
+    const raw = JSON.parse(localStorage.getItem("vastCreativeFreq") || "{}");
+    const now = Date.now();
+    // Чистим устаревшие записи
+    Object.keys(raw).forEach(k => { if (now - (raw[k].ts || 0) > CREATIVE_TTL_MS) delete raw[k]; });
+    return raw;
+  } catch(e) { return {}; }
+}
+function saveCreativeFreq(freq) {
+  try { localStorage.setItem("vastCreativeFreq", JSON.stringify(freq)); } catch(e) {}
+}
+
+let creativeFreq = loadCreativeFreq();
+
+// Сколько раз этот creative показан данному device
+function getCreativeCountForDevice(adId, deviceId) {
+  if (!adId || !deviceId) return 0;
+  return creativeFreq[adId]?.perDevice?.[deviceId] || 0;
+}
+
+// Сколько раз creative показан глобально за месяц
+function getCreativeCountGlobal(adId) {
+  if (!adId) return 0;
+  return creativeFreq[adId]?.globalCount || 0;
+}
+
+// Можно ли показать этот creative данному device?
+function canShowCreative(adId, deviceId) {
+  if (!adId) return true;
+  const perDev = getCreativeCountForDevice(adId, deviceId);
+  const global = getCreativeCountGlobal(adId);
+  const okPerDevice = perDev < CONFIG.maxCreativeShowsPerDevice;
+  const okGlobal    = global < CONFIG.maxCreativeShowsGlobal;
+  if (!okPerDevice) log(`Creative ${adId.slice(0,8)}: лимит на device (${perDev}/${CONFIG.maxCreativeShowsPerDevice})`, 'warn');
+  if (!okGlobal)    log(`Creative ${adId.slice(0,8)}: глобальный лимит (${global}/${CONFIG.maxCreativeShowsGlobal}) — меняем device`, 'warn');
+  return okPerDevice && okGlobal;
+}
+
+// Записываем факт показа creative
+function recordCreativeShow(adId, deviceId) {
+  if (!adId) return;
+  if (!creativeFreq[adId]) creativeFreq[adId] = { perDevice: {}, globalCount: 0, ts: Date.now() };
+  creativeFreq[adId].perDevice[deviceId] = (creativeFreq[adId].perDevice[deviceId] || 0) + 1;
+  creativeFreq[adId].globalCount = (creativeFreq[adId].globalCount || 0) + 1;
+  // Ограничиваем размер словаря perDevice (не более 200 device на creative)
+  const devKeys = Object.keys(creativeFreq[adId].perDevice);
+  if (devKeys.length > 200) delete creativeFreq[adId].perDevice[devKeys[0]];
+  // Ограничиваем общий словарь (не более 100 разных creative)
+  const allKeys = Object.keys(creativeFreq);
+  if (allKeys.length > 100) delete creativeFreq[allKeys[0]];
+  saveCreativeFreq(creativeFreq);
+  const pd = creativeFreq[adId].perDevice[deviceId];
+  const gl = creativeFreq[adId].globalCount;
+  log(`Creative ${adId.slice(0,8)}: device=${pd}/${CONFIG.maxCreativeShowsPerDevice}, global=${gl}/${CONFIG.maxCreativeShowsGlobal}`, 'pool');
+}
+
+/* ============================================================
+   DEVICE CONTEXT
+   ============================================================ */
+let deviceCtx = null;
 
 async function buildDeviceContext() {
-  // Таймзоны РФ — распределение приближено к долям населения
   const RU_TIMEZONES = [
-    ["Europe/Moscow",       52],  // Москва, ЦФО — самая populous
-    ["Europe/Moscow",       10],  // +дополнительный вес МСК
-    ["Europe/Samara",        5],  // Поволжье
-    ["Asia/Yekaterinburg",   8],  // Урал, Тюмень
-    ["Asia/Omsk",            3],  // Омск
-    ["Asia/Krasnoyarsk",     4],  // Красноярск, Хакасия
-    ["Asia/Irkutsk",         3],  // Иркутск, Бурятия
-    ["Asia/Yakutsk",         2],  // Якутия (часть)
-    ["Asia/Vladivostok",     3],  // Приморье, Хабаровск
-    ["Europe/Kaliningrad",   2],  // Калининград
+    ["Europe/Moscow",       52],
+    ["Europe/Moscow",       10],
+    ["Europe/Samara",        5],
+    ["Asia/Yekaterinburg",   8],
+    ["Asia/Omsk",            3],
+    ["Asia/Krasnoyarsk",     4],
+    ["Asia/Irkutsk",         3],
+    ["Asia/Yakutsk",         2],
+    ["Asia/Vladivostok",     3],
+    ["Europe/Kaliningrad",   2],
   ];
-  // Взвешенный случайный выбор таймзоны
   function weightedTz() {
     const raw = Intl.DateTimeFormat().resolvedOptions().timeZone;
-    // Если уже российская — оставляем как есть
     if (raw.startsWith("Europe/Moscow") || raw.startsWith("Asia/Yekaterinburg") ||
         raw.startsWith("Asia/Omsk") || raw.startsWith("Asia/Krasnoyarsk") ||
         raw.startsWith("Asia/Irkutsk") || raw.startsWith("Asia/Yakutsk") ||
@@ -611,19 +679,14 @@ async function buildDeviceContext() {
         raw.startsWith("Europe/Samara") || raw.startsWith("Asia/Anadyr")) {
       return raw;
     }
-    // Нероссийская — подменяем взвешенно
     const total = RU_TIMEZONES.reduce((s, [,w]) => s + w, 0);
     let r = Math.random() * total;
     for (const [tz, w] of RU_TIMEZONES) { r -= w; if (r <= 0) return tz; }
     return "Europe/Moscow";
   }
-
-  // Языки — нормализуем к русскому если нероссийский
-  const RU_LANGS = ["ru-RU", "ru-RU", "ru-RU", "ru", "ru-RU,ru;q=0.9"];
   function normalizeLang() {
     const raw = navigator.language || "";
-    if (raw.startsWith("ru")) return raw; // уже русский
-    // Подменяем на ru-RU
+    if (raw.startsWith("ru")) return raw;
     return "ru-RU";
   }
 
@@ -640,13 +703,11 @@ async function buildDeviceContext() {
   const conn  = navigator.connection?.effectiveType || "4g";
   const touch = navigator.maxTouchPoints > 0 ? 1 : 0;
 
-  // Определяем тип ОС из UA
   const isAndroid = /Android/.test(ua);
   const isIOS     = /iPhone|iPad/.test(ua);
   const osName    = isAndroid ? "Android" : isIOS ? "iOS" : "Unknown";
   const osVer     = (ua.match(/Android ([\d.]+)/) || ua.match(/OS ([\d_]+)/) || ["",""])[1].replace(/_/g,".");
 
-  // Canvas fingerprint — лёгкий, без рендера
   let canvasFp = "0";
   try {
     const c = document.createElement("canvas");
@@ -664,7 +725,7 @@ async function generateId() {
   if (!deviceCtx) deviceCtx = await buildDeviceContext();
   try {
     const fp = [
-      MOBILE_UA,  // используем наш стабильный UA, не navigator.userAgent
+      MOBILE_UA,
       deviceCtx.lang,
       deviceCtx.sw + "x" + deviceCtx.sh,
       screen.colorDepth,
@@ -678,8 +739,6 @@ async function generateId() {
     const buf = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(fp));
     const hex = Array.from(new Uint8Array(buf)).map(b => b.toString(16).padStart(2,"0")).join("");
     const baseHex = hex.slice(0, 16);
-    // Добавляем случайный суффикс чтобы один физический девайс
-    // не всегда запрашивал рекламу с одним и тем же client_id
     const sessionSalt = Math.random().toString(36).slice(2, 10);
     const id = "fp_" + baseHex + sessionSalt;
     log(`Device fingerprint: ...${id.slice(-8)} | ${deviceCtx.osName} ${deviceCtx.osVer} | ${deviceCtx.sw}x${deviceCtx.sh} | ${deviceCtx.conn}`, 'pool');
@@ -694,12 +753,24 @@ async function generateId() {
   }
 }
 
+/* ============================================================
+   DEVICE POOL — управление с учётом частоты creative
+   
+   Ключевое изменение: device НЕ меняется автоматически при
+   каждом показе. Смена device происходит только когда:
+   1. device исчерпал лимит adsPerDevice (3 показа)
+   2. creative достиг лимита PER DEVICE (4 показа этого ролика)
+   3. creative достиг глобального лимита (8 показов за месяц)
+   
+   Это имитирует реальное поведение: один пользователь может
+   увидеть один ролик несколько раз подряд — это нормально.
+   ============================================================ */
+
 async function getActiveDevice() {
   let pool = loadPool();
   const now = Date.now();
   if (pool.length > CONFIG.poolSize * 2) pool = pool.slice(-CONFIG.poolSize * 2);
 
-  // Если был принудительный device — вернуть именно его
   if (forcedDeviceId) {
     let forced = pool.find(d => d.id === forcedDeviceId);
     if (!forced) { forced = { id: forcedDeviceId, plays: 0, cooldownUntil: 0 }; pool.unshift(forced); }
@@ -709,20 +780,18 @@ async function getActiveDevice() {
     return forced;
   }
 
-  // Берём всех доступных (не исчерпали лимит, не в cooldown)
-  // и выбираем СЛУЧАЙНОГО — не первого по порядку
-  // Это имитирует естественное распределение трафика между разными пользователями
+  // Выбираем из доступных случайным образом — не всегда первый
   const available = pool.filter(d => d.plays < CONFIG.adsPerDevice && now >= (d.cooldownUntil || 0));
   let device = available.length > 0
     ? available[Math.floor(Math.random() * available.length)]
     : null;
+
   if (!device) {
     let expired = pool.find(d => now >= (d.cooldownUntil || 0));
     if (expired) {
       log(`Pool: сброс cooldown для ...${expired.id.slice(-6)}`, 'pool');
       expired.plays = 0; expired.cooldownUntil = 0; device = expired;
     } else {
-      // Первый ID = fingerprint (стабильный). Последующие = частично случайные.
       const baseId = await generateId();
       const newId = pool.length === 0 ? baseId
         : 'fp_' + baseId.slice(3, 7) + Math.random().toString(36).slice(2, 10) + Date.now().toString(36).slice(-4);
@@ -736,15 +805,13 @@ async function getActiveDevice() {
   return device;
 }
 
-// Принудительно создаём новый device_id и запоминаем его
 let forcedDeviceId = null;
+
 async function forceNextDevice() {
   const pool = loadPool();
-  // Генерируем случайный ID — fingerprint всегда одинаков на том же устройстве
-  // Случайный suffix + timestamp даёт SSP ощущение нового пользователя
   const randSuffix = Math.random().toString(36).slice(2, 10) + Date.now().toString(36).slice(-4);
-  const baseId = await generateId(); // берём базу из fingerprint
-  const newId = 'fp_' + baseId.slice(3, 7) + randSuffix; // меняем хвост на случайный
+  const baseId = await generateId();
+  const newId = 'fp_' + baseId.slice(3, 7) + randSuffix;
   const newDevice = { id: newId, plays: 0, cooldownUntil: 0 };
   pool.unshift(newDevice);
   if (pool.length > CONFIG.poolSize * 2) pool.pop();
@@ -763,7 +830,7 @@ function recordPlay(deviceId) {
     if (device.plays >= CONFIG.adsPerDevice) {
       device.cooldownUntil = Date.now() + CONFIG.cooldownMs;
       device.plays = 0;
-      log(`Pool: ...${deviceId.slice(-6)} → cooldown ${Math.round(CONFIG.cooldownMs/60000)}мин`, 'pool');
+      log(`Pool: ...${deviceId.slice(-6)} → cooldown ${Math.round(CONFIG.cooldownMs/86400000)}д`, 'pool');
     } else {
       log(`Pool: ...${deviceId.slice(-6)} показов: ${device.plays}/${CONFIG.adsPerDevice}`, 'pool');
     }
@@ -782,82 +849,56 @@ function hashCode(str) {
 function showLoader(show) { show ? loader.classList.remove("hidden") : loader.classList.add("hidden"); }
 function bumpGlobalIndex() { globalPlayIndex++; localStorage.setItem("vastGlobalIndex", globalPlayIndex); }
 
+// Пауза с человеческой вариацией — важно для anti-fraud
+function humanDelay(minMs, maxMs) {
+  const ms = minMs + Math.floor(Math.random() * (maxMs - minMs));
+  return new Promise(resolve => setTimeout(resolve, ms));
+}
+
 /* ============================================================
    VAST
    ============================================================ */
 async function buildVastUrl(deviceId, playIndex) {
   const groupSize   = 3;
   const deviceGroup = hashCode(deviceId) % groupSize;
-  const segment     = Math.floor(playIndex / groupSize);
-  const shuffle     = Math.random() > 0.7 ? 1 : 0;
-  const cb          = Date.now() + Math.floor(Math.random() * 999999);
-
-  // Собираем дополнительные сигналы из deviceCtx
   const ctx   = deviceCtx || {};
-  const sw    = ctx.sw || screen.width;
-  const sh    = ctx.sh || screen.height;
-  const dpr   = ctx.dpr || window.devicePixelRatio || 2;
-  const lang  = encodeURIComponent(ctx.lang || "ru-RU");
-  const tz    = encodeURIComponent(ctx.tz  || "Europe/Moscow");
-  const osName = encodeURIComponent(ctx.osName || "Android");
-  const osVer  = encodeURIComponent(ctx.osVer  || "13");
-
-  // Размер плеера — fullscreen
-  const pw = window.innerWidth  || sw;
-  const ph = window.innerHeight || sh;
-
-  // Живая вариативность — меняется при каждом запросе как у реального пользователя
-  // Тип соединения: реальный если доступен, иначе естественное чередование wifi/4g
-  const connTypes = ["4g", "4g", "4g", "wifi", "wifi", "3g"]; // веса: 4g чаще всего
-  const liveConn = navigator.connection?.effectiveType
-    || connTypes[Math.floor(Math.random() * connTypes.length)];
-
-  // cb с человеческой вариацией — не точный timestamp, а с погрешностью 0.5–4с назад
+  const conn  = navigator.connection?.effectiveType || ctx.conn || "4g";
   const humanCb = Date.now() - Math.floor(Math.random() * 3500 + 500);
 
-  // Батарея — если API доступен, иначе реалистичный диапазон (30–95%)
   let batteryLevel = null;
   try {
     const bat = await navigator.getBattery?.();
     if (bat) batteryLevel = Math.round(bat.level * 100);
   } catch(e) {}
-  const battery = batteryLevel ?? (30 + Math.floor(Math.random() * 65));
 
   const params = new URLSearchParams({
-    // Точный официальный шаблон от Wink SSP — только их параметры
     ad_place_type:    "preroll",
     age_value:        "18",
     broadcast_type:   "ott",
     client_id:        deviceId,
-    client_version:   "",             // пустой — так рекомендовал Wink
+    client_version:   "",
     domain:           "t.me",
-    embedded:         "P5",           // наш источник
+    embedded:         "P5",
     is_child:         "false",
     is_paid:          "0",
     location:         "100001",
     san:              "web_vast_code",
     ad_position:      "1",
     content_id:       "23080",
-    device_type:      "NCWEB",        // официальное значение для веб от Wink
-    web_client_type:  "mobile",       // mobile т.к. TMA на телефоне
+    device_type:      "NCWEB",
+    web_client_type:  "mobile",
     cb:               humanCb,
   });
 
   return `https://ssp.wink.ru/v1/rt/avod/vast?${params.toString()}`;
 }
 
-// UA реального мобильного Chrome — повышает доверие SSP и ставки
-// Используем реальный UA устройства — подделка UA создаёт fraud-сигнал для SSP
-// SSP видит iOS fingerprint + Android UA = несовпадение = no-fill или бан
 const MOBILE_UA = navigator.userAgent;
 
 async function fetchWithTimeout(url, timeoutMs) {
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), timeoutMs);
   try {
-    // Минимальные заголовки — только безопасные для iOS WebKit
-    // User-Agent через заголовок блокируется WebView на iOS (политика WebKit)
-    // UA передаётся в параметре VAST URL, не в заголовке
     const res = await fetch(url, {
       signal: controller.signal,
       headers: {
@@ -881,10 +922,8 @@ async function resolveVast(url, depth = 0, parentXml = '') {
     log(`VAST fetch error: ${fetchErr.message} | URL начало: ${url.slice(0,80)}`, 'error');
     throw fetchErr;
   }
-  // Логируем raw XML для диагностики — видно что именно отдаёт SSP
   log(`VAST ответ: ${xml.length}б | ${xml.slice(0,200).replace(/\s+/g,' ')}`, 'vast');
 
-  // Детектируем No-Fill явно — SSP вернул пустой VAST без <Ad>
   const hasAd = xml.includes('<Ad ') || xml.includes('<Ad>');
   if (!hasAd && xml.includes('<VAST')) {
     log(`VAST No-Fill — SSP не дал рекламу. XML: ${xml.slice(0,150).replace(/\s+/g,' ')}`, 'warn');
@@ -897,10 +936,8 @@ async function resolveVast(url, depth = 0, parentXml = '') {
   const wrapper = xml.match(/<VASTAdTagURI><!\[CDATA\[([\s\S]*?)\]\]>/);
   if (wrapper) {
     log(`VAST wrapper → цепочка`, 'vast');
-    // Сохраняем родительский XML — в нём может быть ClickThrough
     return resolveVast(wrapper[1].trim(), depth + 1, parentXml + xml);
   }
-  // Мержим дочерний + родительские XML чтобы не потерять ClickThrough
   const merged = xml + parentXml;
   const hasMedia = merged.includes('MediaFile') || merged.includes('.mp4');
   log(`VAST разобран. MediaFile: ${hasMedia ? 'найден ✓' : 'НЕ найден ✗'}`, hasMedia ? 'vast' : 'warn');
@@ -908,12 +945,9 @@ async function resolveVast(url, depth = 0, parentXml = '') {
 }
 
 function extractMedia(xml) {
-  // Фильтруем только реальные видеофайлы — пропускаем VPAID (.js, apiFramework="VPAID")
   try {
     const doc    = new DOMParser().parseFromString(xml, "text/xml");
     const mediaFiles = Array.from(doc.querySelectorAll("MediaFile"));
-
-    // Сначала ищем mp4/webm без VPAID
     for (const m of mediaFiles) {
       const api  = (m.getAttribute("apiFramework") || "").toUpperCase();
       const type = (m.getAttribute("type") || "").toLowerCase();
@@ -925,8 +959,6 @@ function extractMedia(xml) {
         return url;
       }
     }
-
-    // Если строгий фильтр ничего не нашёл — берём любой не-VPAID MediaFile
     for (const m of mediaFiles) {
       const api = (m.getAttribute("apiFramework") || "").toUpperCase();
       const url = m.textContent.trim();
@@ -934,86 +966,146 @@ function extractMedia(xml) {
       if (url.startsWith("http")) { log(`Media URL (fallback): ${url.slice(0,70)}...`, 'ok'); return url; }
     }
   } catch(e) { log(`Ошибка парсинга XML: ${e.message}`, 'warn'); }
-
-  // Последний шанс — regex только для mp4
   const match = xml.match(/https?:\/\/[^\s"<>]+\.mp4[^\s"<>]*/i);
   if (match) { log(`Media URL (regex mp4): ${match[0].slice(0,70)}...`, 'ok'); return match[0]; }
   return null;
 }
 
-/* ============================================================
-   SKIP
-   ============================================================ */
-let skipTimer = null;
-
-function resetSkip() {
-  skipBtn.style.display = "none";
-  if (skipTimer) clearTimeout(skipTimer);
-}
-
-function startSkipCountdown() {
-  resetSkip();
-  skipTimer = setTimeout(() => {
-    skipBtn.style.display = "flex";
-    log('Кнопка пропуска показана', 'debug');
-  }, CONFIG.skipDelaySec * 1000);
-}
-
-/* ============================================================
-   PRELOAD — предзагружаем следующий VAST пока играет текущий
-   ============================================================ */
-let preloadCache = null; // { mediaUrl, clickUrl, trackers }
-let currentXml = ''; // xml текущего показываемого креатива
-// Трекер показанных креативов — Ad id из VAST
-// Ключ: Ad id, значение: количество показов
-// Не даём одному ролику показываться больше 2 раз подряд на устройстве
-const MAX_CREATIVE_SHOWS = 1; // один ролик = один показ, при повторе меняем device
-const CREATIVE_TTL_MS = 30 * 24 * 60 * 60 * 1000; // creatives помним 30 дней
-
-function loadCreatives() {
-  try {
-    const raw = JSON.parse(localStorage.getItem("vastCreatives") || "{}");
-    // Чистим устаревшие (старше 30 дней)
-    const now = Date.now();
-    Object.keys(raw).forEach(k => { if (now - (raw[k].ts || 0) > CREATIVE_TTL_MS) delete raw[k]; });
-    return raw;
-  } catch(e) { return {}; }
-}
-function saveCreatives(c) {
-  try { localStorage.setItem("vastCreatives", JSON.stringify(c)); } catch(e) {}
-}
-let shownCreatives = loadCreatives(); // { adId: { count, ts } }
-
 function getAdId(xml) {
   try {
     const doc = new DOMParser().parseFromString(xml, 'text/xml');
-    // Берём id из InLine Ad — это финальный креатив
     const inlineAd = doc.querySelector('Ad > InLine');
     if (inlineAd) return inlineAd.closest('Ad')?.getAttribute('id') || null;
   } catch(e) {}
   return null;
 }
 
-function isCreativeFresh(adId) {
-  if (!adId) return true;
-  return ((shownCreatives[adId]?.count) || 0) < MAX_CREATIVE_SHOWS;
+/* ============================================================
+   SKIP + АВТОПРОПУСК
+   
+   Выбираем поведение ДО старта ролика:
+   - full-view (55% из сегмента): ждём события ended — пропуска нет
+   - full-view (45% из сегмента): показываем кнопку после skipDelaySec,
+     нажимаем автоматически когда progress ≥ выбранного порога (80–100%)
+   - mid-skip / early-skip: показываем кнопку после skipDelaySec,
+     нажимаем автоматически на выбранном проценте просмотра
+   
+   Кнопка ВСЕГДА становится доступна через skipDelaySec (12с) —
+   автонажатие ждёт нужного прогресса независимо от этого.
+   ============================================================ */
+let skipTimer     = null;
+let autoSkipTimer = null;
+let currentSkipBehavior = null; // { segment, targetPct, willAutoSkip }
+
+function resetSkip() {
+  skipBtn.style.display = "none";
+  if (skipTimer)     clearTimeout(skipTimer);
+  if (autoSkipTimer) clearTimeout(autoSkipTimer);
+  skipTimer     = null;
+  autoSkipTimer = null;
+  currentSkipBehavior = null;
+  video.removeEventListener("timeupdate", _autoSkipCheck);
 }
 
-function recordCreative(adId) {
-  if (!adId) return;
-  const prev = shownCreatives[adId]?.count || 0;
-  shownCreatives[adId] = { count: prev + 1, ts: Date.now() };
-  // Чистим если накопилось > 200
-  const keys = Object.keys(shownCreatives);
-  if (keys.length > 200) delete shownCreatives[keys[0]];
-  saveCreatives(shownCreatives);
+// Взвешенный случайный выбор сегмента
+function pickSkipBehavior() {
+  const segments = CONFIG.autoSkip.segments;
+  let r = Math.random();
+  for (const seg of segments) { r -= seg.prob; if (r <= 0) return seg; }
+  return segments[0];
 }
 
-async function preloadNext() {
+// Слушатель прогресса для автоматического пропуска
+function _autoSkipCheck() {
+  if (!currentSkipBehavior?.willAutoSkip) return;
+  const dur = video.duration;
+  if (!dur || dur === Infinity) return;
+  const pct = video.currentTime / dur;
+  if (pct >= currentSkipBehavior.targetPct) {
+    video.removeEventListener("timeupdate", _autoSkipCheck);
+    log(`AutoSkip: ${Math.round(pct * 100)}% (цель ${Math.round(currentSkipBehavior.targetPct * 100)}%, сегмент: ${currentSkipBehavior.label})`, 'info');
+    // Небольшая случайная задержка перед нажатием — имитирует время реакции человека (200–900мс)
+    const reactionMs = 200 + Math.floor(Math.random() * 700);
+    autoSkipTimer = setTimeout(() => {
+      pingTracker(currentTrackers?.skip, 'skip');
+      resetSkip();
+      setClickUrl(null);
+      startAd();
+    }, reactionMs);
+  }
+}
+
+function startSkipCountdown() {
+  resetSkip();
+
+  // Выбираем поведение для этого ролика
+  const seg = pickSkipBehavior();
+
+  // Для full-view: решаем досмотрит или нажмёт skip после 80%
+  const isFullWatch = seg.label === "full-view" && Math.random() < CONFIG.autoSkip.fullViewWatchRatio;
+
+  if (isFullWatch) {
+    // Досматривает до конца — кнопку показываем, но не нажимаем автоматически
+    currentSkipBehavior = { segment: seg, targetPct: 1.0, willAutoSkip: false, label: seg.label };
+    skipTimer = setTimeout(() => {
+      skipBtn.style.display = "flex";
+      log('Кнопка пропуска показана (досматривает)', 'debug');
+    }, CONFIG.skipDelaySec * 1000);
+    return;
+  }
+
+  // Выбираем точный момент пропуска внутри диапазона сегмента
+  // Добавляем небольшое смещение к нижней границе для реализма
+  const range   = seg.maxPct - seg.minPct;
+  // Используем бета-подобное распределение внутри диапазона:
+  // берём минимум двух случайных — смещает распределение ближе к началу диапазона
+  // (люди чаще пропускают сразу как появилась возможность, а не ждут максимума)
+  const r1 = Math.random(), r2 = Math.random();
+  const rawPct  = seg.label === "full-view"
+    ? seg.minPct + range * Math.max(r1, r2)   // full-view: ближе к концу
+    : seg.minPct + range * Math.min(r1, r2);  // skip: ближе к началу диапазона
+  const targetPct = Math.round(rawPct * 100) / 100; // округляем до 1%
+
+  currentSkipBehavior = { segment: seg, targetPct, willAutoSkip: true, label: seg.label };
+  log(`AutoSkip запланирован: ${Math.round(targetPct * 100)}% (сегмент: ${seg.label})`, 'debug');
+
+  // Показываем кнопку через skipDelaySec — независимо от autoSkip
+  skipTimer = setTimeout(() => {
+    skipBtn.style.display = "flex";
+    log('Кнопка пропуска показана', 'debug');
+  }, CONFIG.skipDelaySec * 1000);
+
+  // Слушаем прогресс — ждём нужного момента
+  video.addEventListener("timeupdate", _autoSkipCheck);
+}
+
+/* ============================================================
+   PRELOAD — предзагружаем следующий VAST пока играет текущий.
+   
+   ВАЖНО: preloadNext НЕ вызывает forceNextDevice() автоматически.
+   Он использует текущий активный device или создаёт новый только
+   если текущий device близок к исчерпанию лимита.
+   Это убирает двойной deviceId churn из оригинального кода.
+   ============================================================ */
+let preloadCache = null;
+
+async function preloadNext(currentDeviceId) {
   try {
-    // Для preload всегда берём СЛЕДУЮЩИЙ device из pool (не текущий активный)
-    // Иначе кэшируется тот же client_id что только что показал рекламу
-    await forceNextDevice();
+    // Проверяем — нужен ли новый device для preload?
+    // Если текущий device ещё не исчерпал лимит, используем его же
+    const pool = loadPool();
+    const currentDevice = pool.find(d => d.id === currentDeviceId);
+    const needNewDevice = !currentDevice || currentDevice.plays >= CONFIG.adsPerDevice - 1;
+
+    if (needNewDevice) {
+      await forceNextDevice();
+      log(`Preload: device близок к лимиту — создаём новый`, 'pool');
+    } else {
+      // Используем тот же device — он может увидеть следующий ролик
+      forcedDeviceId = currentDeviceId;
+      log(`Preload: используем тот же device ...${currentDeviceId.slice(-6)}`, 'pool');
+    }
+
     const device  = await getActiveDevice();
     const nextIdx = globalPlayIndex + 1;
     const vastUrl = await buildVastUrl(device.id, nextIdx);
@@ -1021,17 +1113,38 @@ async function preloadNext() {
     const mediaUrl = extractMedia(xml);
     const clickUrl = extractClickThrough(xml);
     const trackers = extractTrackers(xml);
+    const adId = getAdId(xml);
+
     if (mediaUrl) {
-      preloadCache = { mediaUrl, clickUrl, trackers, deviceId: device.id, adId: getAdId(xml), xml };
-      log(`Preload: следующий ролик готов [${device.id.slice(-6)}]`, 'info');
+      preloadCache = { mediaUrl, clickUrl, trackers, deviceId: device.id, adId, xml };
+      log(`Preload: ролик готов [device=...${device.id.slice(-6)}, creative=${adId?.slice(0,8) || 'unknown'}]`, 'info');
+    } else {
+      preloadCache = null;
+      log(`Preload: нет медиа — кэш сброшен`, 'warn');
     }
   } catch(e) {
     preloadCache = null;
+    log(`Preload ошибка: ${e.message}`, 'warn');
   }
 }
 
 /* ============================================================
    ОСНОВНОЙ ЦИКЛ
+   
+   Логика принятия решений о смене device:
+   
+   A) creative из preloadCache → проверяем canShowCreative(adId, deviceId)
+      - можно показывать: используем как есть
+      - нельзя (лимит): сбрасываем preloadCache и делаем новый запрос
+                        с ТЕКУЩИМ (не новым) device — он ещё может видеть другой creative
+   
+   B) свежий VAST → проверяем canShowCreative(adId, device.id)
+      - можно: показываем
+      - нельзя (per-device лимит): пробуем снова на том же device (может дать другой creative)
+      - нельзя (global лимит): меняем device т.к. это ограничение не зависит от device
+   
+   Смена device происходит только при глобальном лимите creative
+   или исчерпании adsPerDevice — не при каждом показе.
    ============================================================ */
 let currentSession = 0;
 
@@ -1048,14 +1161,13 @@ async function startAd() {
   video.removeAttribute("src");
   video.load();
 
-  // Человеческая задержка перед запросом (300–1200мс) — антифрод сигнал
-  const humanDelay = 300 + Math.floor(Math.random() * 900);
-  await delay(humanDelay);
+  // Межсессионная пауза — имитирует естественное поведение пользователя
+  // Реальный юзер не переключает контент моментально
+  await humanDelay(CONFIG.minInterSessionMs, CONFIG.maxInterSessionMs);
   if (mySession !== currentSession) return;
 
   const device    = await getActiveDevice();
   currentDeviceId = device.id;
-
   log(`Device: ...${device.id.slice(-6)}, plays=${device.plays}`, 'info');
 
   statsAttempts++;
@@ -1066,52 +1178,71 @@ async function startAd() {
     log(`Попытка ${attempt}/${CONFIG.maxRetries}`, 'info');
 
     try {
-      let mediaUrl, clickUrl;
+      let mediaUrl, clickUrl, adId, useDeviceId;
 
-      // Используем предзагруженный VAST если есть
       if (preloadCache) {
-        ({ mediaUrl, clickUrl } = preloadCache);
-        currentTrackers = preloadCache.trackers || null;
-        // Проверяем не показывали ли уже этот креатив — если да, сбрасываем кэш
-        const cachedAdId = preloadCache.adId;
-        if (cachedAdId && !isCreativeFresh(cachedAdId)) {
-          log(`Preload: креатив ${cachedAdId.slice(-8)} уже показан — сбрасываем кэш`, 'warn');
-          preloadCache = null;
-          await forceNextDevice();
+        const cached = preloadCache;
+        preloadCache = null;
+
+        if (cached.adId && !canShowCreative(cached.adId, cached.deviceId)) {
+          // Preload-кэш не подходит — creative на лимите.
+          // НЕ создаём новый device — просто запрашиваем заново с текущим
+          log(`Preload: creative ${cached.adId.slice(0,8)} на лимите — запрашиваем заново`, 'warn');
+          // Падаем на обычный VAST запрос ниже (preloadCache уже null)
         } else {
-          // Используем device из кэша — он уже авторизован для этого VAST
-          if (preloadCache?.deviceId) {
-            const cachedDevice = { id: preloadCache.deviceId, plays: 0, cooldownUntil: 0 };
-            forcedDeviceId = cachedDevice.id;
-          }
-          currentXml = preloadCache.xml || '';
-          preloadCache = null;
-          log(`Используем preload-кэш`, 'info');
+          // Preload подходит — используем его device
+          mediaUrl = cached.mediaUrl;
+          clickUrl = cached.clickUrl;
+          currentTrackers = cached.trackers;
+          adId = cached.adId;
+          useDeviceId = cached.deviceId;
+          // Устанавливаем device из кэша как активный
+          forcedDeviceId = cached.deviceId;
+          const cachedDev = await getActiveDevice();
+          currentDeviceId = cachedDev.id;
+          log(`Используем preload-кэш [device=...${useDeviceId?.slice(-6)}, creative=${adId?.slice(0,8)||'?'}]`, 'info');
         }
-      } else {
+      }
+
+      if (!mediaUrl) {
+        // Обычный VAST запрос
         const vastUrl = await buildVastUrl(device.id, globalPlayIndex);
         const xml     = await resolveVast(vastUrl);
         if (mySession !== currentSession) return;
-        currentXml = xml; // сохраняем для определения adId при записи показа
+
         mediaUrl = extractMedia(xml);
-        // Проверяем не повтор ли этот креатив — если да, меняем device и пробуем снова
-        const freshAdId = getAdId(xml);
-        if (freshAdId && !isCreativeFresh(freshAdId)) {
-          log(`Creative ${freshAdId.slice(0,8)}... уже показан — меняем device`, 'warn');
-          await forceNextDevice();
-          bumpGlobalIndex();
-          startAd(); return;
+        adId     = getAdId(xml);
+        useDeviceId = device.id;
+
+        if (adId && !canShowCreative(adId, device.id)) {
+          // Creative на лимите для этого device
+          const globalExceeded = getCreativeCountGlobal(adId) >= CONFIG.maxCreativeShowsGlobal;
+          if (globalExceeded) {
+            // Глобальный лимит — меняем device
+            log(`Creative ${adId.slice(0,8)}: глобальный лимит → новый device`, 'warn');
+            await forceNextDevice();
+            bumpGlobalIndex();
+            startAd(); return;
+          } else {
+            // Per-device лимит — НЕ меняем device, просто пробуем ещё раз
+            // SSP может выдать другой creative на следующей попытке
+            log(`Creative ${adId.slice(0,8)}: лимит на device → повтор запроса (device тот же)`, 'warn');
+            globalPlayIndex = (globalPlayIndex + Math.floor(Math.random() * 7 + 1)) % 10000;
+            localStorage.setItem('vastGlobalIndex', globalPlayIndex);
+            await humanDelay(CONFIG.noAdRetryMs, CONFIG.noAdRetryMs * 2);
+            continue;
+          }
         }
+
         clickUrl = extractClickThrough(xml);
         currentTrackers = extractTrackers(xml);
       }
 
       if (!mediaUrl) {
-        // При no-fill меняем play_index — запрашиваем другой креатив из пула SSP
         globalPlayIndex = (globalPlayIndex + Math.floor(Math.random() * 7 + 1)) % 10000;
         localStorage.setItem('vastGlobalIndex', globalPlayIndex);
-        log(`Попытка ${attempt}: нет медиа → новый index=${globalPlayIndex}, пауза ${CONFIG.noAdRetryMs}мс`, 'warn');
-        await delay(CONFIG.noAdRetryMs);
+        log(`Попытка ${attempt}: нет медиа → новый index=${globalPlayIndex}, пауза`, 'warn');
+        await humanDelay(CONFIG.noAdRetryMs, CONFIG.noAdRetryMs * 2);
         continue;
       }
 
@@ -1156,23 +1287,27 @@ async function startAd() {
       }
 
       startSkipCountdown();
-      recordPlay(device.id);
+
+      // Записываем показы ПОСЛЕ успешного запуска
+      const finalDeviceId = useDeviceId || device.id;
+      recordPlay(finalDeviceId);
       bumpGlobalIndex();
       statsSuccess++;
-      // Записываем показанный креатив
-      const adId = getAdId(currentXml || '');
-      if (adId) { recordCreative(adId); log(`Creative: ${adId.slice(0,8)}... показов: ${shownCreatives[adId]?.count}/${MAX_CREATIVE_SHOWS}`, 'pool'); }
-      // После каждого показа принудительно переключаем device
-      // Не ждём пока pool случайно выберет другой — меняем всегда
-      await forceNextDevice();
-      // VAST tracking — Impression + quartile events
+
+      if (adId) {
+        recordCreativeShow(adId, finalDeviceId);
+      }
+
+      // Запускаем трекинг
       pingTracker(currentTrackers?.impression, 'impression');
       setupTrackingEvents(currentTrackers, video);
       log(`Ролик запущен ✓ globalIndex → ${globalPlayIndex}`, 'ok');
-      // Выводим статистику каждые 5 успешных показов
+
       if (statsSuccess % 5 === 0) logStats();
-      // Предзагружаем следующий VAST пока играет текущий
-      setTimeout(() => preloadNext(), 2000);
+
+      // Предзагружаем следующий через 2 секунды,
+      // передаём текущий deviceId чтобы preload мог решить менять ли device
+      setTimeout(() => preloadNext(finalDeviceId), 2000);
       return;
 
     } catch(e) {
@@ -1182,20 +1317,18 @@ async function startAd() {
       else if (msg === "Load failed") msg = "Load failed (iOS WebKit CORS/сеть)";
       else if (msg === "Failed to fetch") msg = "Failed to fetch (CORS/сеть)";
       log(`ОШИБКА попытки ${attempt}: ${msg}`, 'error');
-      await delay(CONFIG.retryDelayMs * attempt);
+      await humanDelay(CONFIG.retryDelayMs * attempt, CONFIG.retryDelayMs * attempt * 2);
     }
   }
 
   if (mySession !== currentSession) return;
   statsFail++;
-  log(`Все попытки провалились → смена device + пауза 3с`, 'error');
-  // Пингуем Error трекер — IAB стандарт, SSP ожидает этот сигнал при провале
+  log(`Все попытки провалились → смена device + пауза`, 'error');
   pingTracker(currentTrackers?.error?.map(u => u.replace("[ERRORCODE]", "900")), 'error:900');
   logStats();
-  // Принудительно переключаем device_id чтобы получить другую рекламу
   await forceNextDevice();
   showLoader(false);
-  await delay(3000);
+  await humanDelay(3000, 5000);
   startAd();
 }
 
@@ -1206,6 +1339,7 @@ function delay(ms) { return new Promise(resolve => setTimeout(resolve, ms)); }
    ============================================================ */
 video.addEventListener("ended", () => {
   log('Видео завершено', 'ok');
+  video.removeEventListener("timeupdate", _autoSkipCheck);
   resetSkip(); setClickUrl(null);
   startAd();
 });
@@ -1215,14 +1349,14 @@ video.addEventListener("error", () => {
 });
 video.addEventListener("waiting", () => log('Буферизация...', 'debug'));
 video.addEventListener("stalled", () => log('Зависание потока (stalled)', 'warn'));
-let adStartTime = 0; // фиксируем когда начали загрузку
+let adStartTime = 0;
 video.addEventListener("playing", () => {
   const ttff = adStartTime ? Math.round(Date.now() - adStartTime) : 0;
   log(`Воспроизведение (playing) | TTFF: ${ttff}мс`, ttff > 3000 ? 'warn' : 'ok');
 });
 
 skipBtn.onclick = () => {
-  log('Skip', 'info');
+  log('Skip (ручной)', 'info');
   pingTracker(currentTrackers?.skip, 'skip');
   pingTracker(currentTrackers?.clickTracking, 'clickTracking');
   resetSkip(); setClickUrl(null); startAd();
@@ -1240,7 +1374,6 @@ closeBtn.onclick = () => {
    ============================================================ */
 log('Плеер запущен', 'ok');
 
-// Принудительный поворот в ландшафт при запуске плеера
 (async () => {
   const tgApp = window.Telegram?.WebApp;
   let locked = false;
@@ -1275,31 +1408,27 @@ log('Плеер запущен', 'ok');
   }
 })();
 
-// Инициализируем device context заранее — до первого VAST запроса
-buildDeviceContext().then(ctx => { deviceCtx = ctx; log(`OS: ${ctx.osName} ${ctx.osVer} | ${ctx.sw}x${ctx.sh} | net: ${ctx.conn}`, 'info'); });
-log(`Config: adsPerDevice=${CONFIG.adsPerDevice}, cooldown=${CONFIG.cooldownMs/60000}мин, poolSize=${CONFIG.poolSize}`, 'debug');
+buildDeviceContext().then(ctx => {
+  deviceCtx = ctx;
+  log(`OS: ${ctx.osName} ${ctx.osVer} | ${ctx.sw}x${ctx.sh} | net: ${ctx.conn}`, 'info');
+});
+log(`Config: adsPerDevice=${CONFIG.adsPerDevice}, cooldown=${CONFIG.cooldownMs/86400000}д, creative перDevice=${CONFIG.maxCreativeShowsPerDevice}, creativeGlobal=${CONFIG.maxCreativeShowsGlobal}`, 'debug');
 log(`Sheets: ${CONFIG.sheetsEnabled ? 'включён ✓' : 'выключен'}`, 'info');
 log(`UA: ${MOBILE_UA.slice(0, 60)}...`, 'info');
 
-// Проверка размера плеера
-// KPI 540×360 — для десктоп. На мобильном fullscreen TMA всегда валиден.
 const pw = window.innerWidth, ph = window.innerHeight;
-// Мобильный fullscreen: меньшая сторона ≥ 360px достаточно
 const isMobileFullscreen = Math.min(pw, ph) >= 360;
 const sizeOk = (pw >= CONFIG.minPlayerW && ph >= CONFIG.minPlayerH) || isMobileFullscreen;
 log(`Размер плеера: ${pw}×${ph} px — ${sizeOk ? '✓ OK' : '✗ НИЖЕ KPI'}`, sizeOk ? 'ok' : 'warn');
 
-// Viewability — Intersection Observer
 const observer = new IntersectionObserver(entries => {
   const ratio = entries[0]?.intersectionRatio ?? 1;
-  // Не логируем viewability если показывается подсказка поворота
   const rotateActive = !!document.getElementById('rotateHint');
   if (ratio < 0.5 && !rotateActive) log(`Viewability: плеер вышел из зоны видимости (${Math.round(ratio*100)}%)`, 'warn');
 }, { threshold: [0, 0.5, 1.0] });
 observer.observe(document.getElementById("playerWrapper"));
 log(`globalPlayIndex: ${globalPlayIndex}`, 'debug');
 
-// Снимаем блокировку ориентации при выходе из плеера
 window.addEventListener("pagehide", () => {
   try { screen.orientation.unlock(); } catch(e) {}
   try { window.Telegram?.WebApp?.unlockOrientation?.(); } catch(e) {}
