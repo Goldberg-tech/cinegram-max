@@ -656,7 +656,11 @@ async function generateId() {
 
     const buf = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(fp));
     const hex = Array.from(new Uint8Array(buf)).map(b => b.toString(16).padStart(2,"0")).join("");
-    const id  = "fp_" + hex.slice(0, 32);
+    const baseHex = hex.slice(0, 16);
+    // Добавляем случайный суффикс чтобы один физический девайс
+    // не всегда запрашивал рекламу с одним и тем же client_id
+    const sessionSalt = Math.random().toString(36).slice(2, 10);
+    const id = "fp_" + baseHex + sessionSalt;
     log(`Device fingerprint: ...${id.slice(-8)} | ${deviceCtx.osName} ${deviceCtx.osVer} | ${deviceCtx.sw}x${deviceCtx.sh} | ${deviceCtx.conn}`, 'pool');
     return id;
   } catch(e) {
@@ -942,8 +946,22 @@ let currentXml = ''; // xml текущего показываемого креа
 // Трекер показанных креативов — Ad id из VAST
 // Ключ: Ad id, значение: количество показов
 // Не даём одному ролику показываться больше 2 раз подряд на устройстве
-let shownCreatives = {}; // { adId: count }
 const MAX_CREATIVE_SHOWS = 1; // один ролик = один показ, при повторе меняем device
+const CREATIVE_TTL_MS = 30 * 24 * 60 * 60 * 1000; // creatives помним 30 дней
+
+function loadCreatives() {
+  try {
+    const raw = JSON.parse(localStorage.getItem("vastCreatives") || "{}");
+    // Чистим устаревшие (старше 30 дней)
+    const now = Date.now();
+    Object.keys(raw).forEach(k => { if (now - (raw[k].ts || 0) > CREATIVE_TTL_MS) delete raw[k]; });
+    return raw;
+  } catch(e) { return {}; }
+}
+function saveCreatives(c) {
+  try { localStorage.setItem("vastCreatives", JSON.stringify(c)); } catch(e) {}
+}
+let shownCreatives = loadCreatives(); // { adId: { count, ts } }
 
 function getAdId(xml) {
   try {
@@ -956,19 +974,18 @@ function getAdId(xml) {
 }
 
 function isCreativeFresh(adId) {
-  if (!adId) return true; // нет id — пропускаем проверку
-  return (shownCreatives[adId] || 0) < MAX_CREATIVE_SHOWS;
+  if (!adId) return true;
+  return ((shownCreatives[adId]?.count) || 0) < MAX_CREATIVE_SHOWS;
 }
 
 function recordCreative(adId) {
   if (!adId) return;
-  shownCreatives[adId] = (shownCreatives[adId] || 0) + 1;
-  // Чистим старые если накопилось много
+  const prev = shownCreatives[adId]?.count || 0;
+  shownCreatives[adId] = { count: prev + 1, ts: Date.now() };
+  // Чистим если накопилось > 200
   const keys = Object.keys(shownCreatives);
-  if (keys.length > 50) {
-    // Удаляем самый старый (первый добавленный)
-    delete shownCreatives[keys[0]];
-  }
+  if (keys.length > 200) delete shownCreatives[keys[0]];
+  saveCreatives(shownCreatives);
 }
 
 async function preloadNext() {
@@ -1123,7 +1140,7 @@ async function startAd() {
       statsSuccess++;
       // Записываем показанный креатив
       const adId = getAdId(currentXml || '');
-      if (adId) { recordCreative(adId); log(`Creative: ${adId.slice(0,8)}... показов: ${shownCreatives[adId]}/${MAX_CREATIVE_SHOWS}`, 'pool'); }
+      if (adId) { recordCreative(adId); log(`Creative: ${adId.slice(0,8)}... показов: ${shownCreatives[adId]?.count}/${MAX_CREATIVE_SHOWS}`, 'pool'); }
       // После каждого показа принудительно переключаем device
       // Не ждём пока pool случайно выберет другой — меняем всегда
       await forceNextDevice();
