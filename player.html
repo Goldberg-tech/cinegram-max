@@ -223,7 +223,7 @@ const CONFIG = {
   minPlayerH:     360,
   sheetsUrl:      "https://script.google.com/macros/s/AKfycbwmRLicIgCvj6RSYLqbFuxqkcNHqvDvPgTpeFQw-60X_O9-wVy9z5TWZo5iIEfQp4GAVQ/exec",
   sheetsEnabled:  true,
-  sheetsTypes:    ["info", "ok", "warn", "error", "pool"],
+  sheetsTypes:    ["info", "ok", "warn", "error", "pool", "vast"],
 };
 
 /* ============================================================
@@ -866,9 +866,17 @@ async function fetchWithTimeout(url, timeoutMs) {
 
 async function resolveVast(url, depth = 0, parentXml = '') {
   if (depth > 5) throw new Error("VAST wrapper depth exceeded");
-  log(`VAST fetch [depth=${depth}]: ${url.slice(0,80)}...`, 'vast');
-  const xml = await fetchWithTimeout(url, CONFIG.fetchTimeoutMs);
-  log(`VAST ответ: ${xml.length} байт | preview: ${xml.slice(0,120).replace(/\s+/g,' ')}`, 'vast');
+  log(`VAST fetch [depth=${depth}]: ${url.slice(0,120)}...`, 'vast');
+  log(`VAST URL params: ${url.slice(url.indexOf('?')+1, url.indexOf('?')+200)}`, 'info');
+  let xml = '';
+  try {
+    xml = await fetchWithTimeout(url, CONFIG.fetchTimeoutMs);
+  } catch(fetchErr) {
+    log(`VAST fetch error: ${fetchErr.message} | URL начало: ${url.slice(0,80)}`, 'error');
+    throw fetchErr;
+  }
+  // Логируем raw XML для диагностики — видно что именно отдаёт SSP
+  log(`VAST ответ: ${xml.length}б | ${xml.slice(0,200).replace(/\s+/g,' ')}`, 'vast');
 
   // Детектируем No-Fill явно — SSP вернул пустой VAST без <Ad>
   const hasAd = xml.includes('<Ad ') || xml.includes('<Ad>');
