@@ -937,7 +937,39 @@ function startSkipCountdown() {
 /* ============================================================
    PRELOAD — предзагружаем следующий VAST пока играет текущий
    ============================================================ */
-let preloadCache = null; // { mediaUrl, clickUrl, xml }
+let preloadCache = null; // { mediaUrl, clickUrl, trackers }
+let currentXml = ''; // xml текущего показываемого креатива
+// Трекер показанных креативов — Ad id из VAST
+// Ключ: Ad id, значение: количество показов
+// Не даём одному ролику показываться больше 2 раз подряд на устройстве
+let shownCreatives = {}; // { adId: count }
+const MAX_CREATIVE_SHOWS = 1; // один ролик = один показ, при повторе меняем device
+
+function getAdId(xml) {
+  try {
+    const doc = new DOMParser().parseFromString(xml, 'text/xml');
+    // Берём id из InLine Ad — это финальный креатив
+    const inlineAd = doc.querySelector('Ad > InLine');
+    if (inlineAd) return inlineAd.closest('Ad')?.getAttribute('id') || null;
+  } catch(e) {}
+  return null;
+}
+
+function isCreativeFresh(adId) {
+  if (!adId) return true; // нет id — пропускаем проверку
+  return (shownCreatives[adId] || 0) < MAX_CREATIVE_SHOWS;
+}
+
+function recordCreative(adId) {
+  if (!adId) return;
+  shownCreatives[adId] = (shownCreatives[adId] || 0) + 1;
+  // Чистим старые если накопилось много
+  const keys = Object.keys(shownCreatives);
+  if (keys.length > 50) {
+    // Удаляем самый старый (первый добавленный)
+    delete shownCreatives[keys[0]];
+  }
+}
 
 async function preloadNext() {
   try {
@@ -952,8 +984,8 @@ async function preloadNext() {
     const clickUrl = extractClickThrough(xml);
     const trackers = extractTrackers(xml);
     if (mediaUrl) {
-      preloadCache = { mediaUrl, clickUrl, trackers };
-      log(`Preload: следующий ролик готов`, 'info');
+      preloadCache = { mediaUrl, clickUrl, trackers, deviceId: device.id, adId: getAdId(xml), xml };
+      log(`Preload: следующий ролик готов [${device.id.slice(-6)}]`, 'info');
     }
   } catch(e) {
     preloadCache = null;
@@ -1002,13 +1034,36 @@ async function startAd() {
       if (preloadCache) {
         ({ mediaUrl, clickUrl } = preloadCache);
         currentTrackers = preloadCache.trackers || null;
-        preloadCache = null;
-        log(`Используем preload-кэш`, 'info');
+        // Проверяем не показывали ли уже этот креатив — если да, сбрасываем кэш
+        const cachedAdId = preloadCache.adId;
+        if (cachedAdId && !isCreativeFresh(cachedAdId)) {
+          log(`Preload: креатив ${cachedAdId.slice(-8)} уже показан — сбрасываем кэш`, 'warn');
+          preloadCache = null;
+          await forceNextDevice();
+        } else {
+          // Используем device из кэша — он уже авторизован для этого VAST
+          if (preloadCache?.deviceId) {
+            const cachedDevice = { id: preloadCache.deviceId, plays: 0, cooldownUntil: 0 };
+            forcedDeviceId = cachedDevice.id;
+          }
+          currentXml = preloadCache.xml || '';
+          preloadCache = null;
+          log(`Используем preload-кэш`, 'info');
+        }
       } else {
         const vastUrl = await buildVastUrl(device.id, globalPlayIndex);
         const xml     = await resolveVast(vastUrl);
         if (mySession !== currentSession) return;
+        currentXml = xml; // сохраняем для определения adId при записи показа
         mediaUrl = extractMedia(xml);
+        // Проверяем не повтор ли этот креатив — если да, меняем device и пробуем снова
+        const freshAdId = getAdId(xml);
+        if (freshAdId && !isCreativeFresh(freshAdId)) {
+          log(`Creative ${freshAdId.slice(0,8)}... уже показан — меняем device`, 'warn');
+          await forceNextDevice();
+          bumpGlobalIndex();
+          startAd(); return;
+        }
         clickUrl = extractClickThrough(xml);
         currentTrackers = extractTrackers(xml);
       }
@@ -1066,9 +1121,12 @@ async function startAd() {
       recordPlay(device.id);
       bumpGlobalIndex();
       statsSuccess++;
-      // После каждого показа сбрасываем текущий device — следующий startAd возьмёт другой из pool
-      // Это обеспечивает перемешивание client_id даже если у device ещё есть plays в запасе
-      forcedDeviceId = null; // сбрасываем forced чтобы getActiveDevice выбрал случайный
+      // Записываем показанный креатив
+      const adId = getAdId(currentXml || '');
+      if (adId) { recordCreative(adId); log(`Creative: ${adId.slice(0,8)}... показов: ${shownCreatives[adId]}/${MAX_CREATIVE_SHOWS}`, 'pool'); }
+      // После каждого показа принудительно переключаем device
+      // Не ждём пока pool случайно выберет другой — меняем всегда
+      await forceNextDevice();
       // VAST tracking — Impression + quartile events
       pingTracker(currentTrackers?.impression, 'impression');
       setupTrackingEvents(currentTrackers, video);
