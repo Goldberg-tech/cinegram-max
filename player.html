@@ -692,7 +692,11 @@ async function getActiveDevice() {
       log(`Pool: сброс cooldown для ...${expired.id.slice(-6)}`, 'pool');
       expired.plays = 0; expired.cooldownUntil = 0; device = expired;
     } else {
-      device = { id: await generateId(), plays: 0, cooldownUntil: 0 };
+      // Первый ID = fingerprint (стабильный). Последующие = частично случайные.
+      const baseId = await generateId();
+      const newId = pool.length === 0 ? baseId
+        : 'fp_' + baseId.slice(3, 7) + Math.random().toString(36).slice(2, 10) + Date.now().toString(36).slice(-4);
+      device = { id: newId, plays: 0, cooldownUntil: 0 };
       pool.push(device);
       if (pool.length > CONFIG.poolSize * 2) pool.shift();
       log(`Pool: новый ID ...${device.id.slice(-6)} (всего: ${pool.length})`, 'pool');
@@ -706,15 +710,19 @@ async function getActiveDevice() {
 let forcedDeviceId = null;
 async function forceNextDevice() {
   const pool = loadPool();
-  const newDevice = { id: await generateId(), plays: 0, cooldownUntil: 0 };
-  pool.unshift(newDevice); // добавляем в начало чтобы getActiveDevice взял первым
+  // Генерируем случайный ID — fingerprint всегда одинаков на том же устройстве
+  // Случайный suffix + timestamp даёт SSP ощущение нового пользователя
+  const randSuffix = Math.random().toString(36).slice(2, 10) + Date.now().toString(36).slice(-4);
+  const baseId = await generateId(); // берём базу из fingerprint
+  const newId = 'fp_' + baseId.slice(3, 7) + randSuffix; // меняем хвост на случайный
+  const newDevice = { id: newId, plays: 0, cooldownUntil: 0 };
+  pool.unshift(newDevice);
   if (pool.length > CONFIG.poolSize * 2) pool.pop();
   savePool(pool);
-  forcedDeviceId = newDevice.id;
-  // Также меняем globalPlayIndex чтобы SSP дал другой ролик
+  forcedDeviceId = newId;
   globalPlayIndex = Math.floor(Math.random() * 1000);
   localStorage.setItem("vastGlobalIndex", globalPlayIndex);
-  log(`Pool: новый ID ...${newDevice.id.slice(-6)}, новый index=${globalPlayIndex}`, 'pool');
+  log(`Pool: принудительный новый ID ...${newId.slice(-6)}, новый index=${globalPlayIndex}`, 'pool');
 }
 
 function recordPlay(deviceId) {
@@ -864,11 +872,11 @@ async function resolveVast(url, depth = 0, parentXml = '') {
   // Детектируем No-Fill явно — SSP вернул пустой VAST без <Ad>
   const hasAd = xml.includes('<Ad ') || xml.includes('<Ad>');
   if (!hasAd && xml.includes('<VAST')) {
-    log(`VAST No-Fill (пустой ответ без <Ad>) — SSP не дал рекламу`, 'warn');
-    return xml; // возвращаем пустой — extractMedia вернёт null
+    log(`VAST No-Fill — SSP не дал рекламу. XML: ${xml.slice(0,150).replace(/\s+/g,' ')}`, 'warn');
+    return xml;
   }
-  if (xml.length < 50) {
-    log(`VAST слишком короткий (${xml.length} байт) — возможно ошибка сети`, 'warn');
+  if (!xml.includes('<VAST') && xml.length < 200) {
+    log(`VAST невалидный (${xml.length}б): ${xml.slice(0,100)}`, 'warn');
   }
 
   const wrapper = xml.match(/<VASTAdTagURI><!\[CDATA\[([\s\S]*?)\]\]>/);
