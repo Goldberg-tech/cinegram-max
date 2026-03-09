@@ -213,12 +213,14 @@ video {
 const CONFIG = {
   adsPerDevice:   3,
   poolSize:       50,
-  cooldownMs:     30 * 60 * 1000,
-  skipDelaySec:   5,
+  cooldownMs:     3 * 60 * 60 * 1000,  // 3 часа — естественная частота (было 30 мин)
+  skipDelaySec:   12,                   // 12 сек — поднимает VTR (было 5)
   fetchTimeoutMs: 8000,
   maxRetries:     3,
   retryDelayMs:   1500,
   noAdRetryMs:    2000,
+  minPlayerW:     540,                  // минимальный размер плеера по KPI
+  minPlayerH:     360,
   sheetsUrl:      "https://script.google.com/macros/s/AKfycbwmRLicIgCvj6RSYLqbFuxqkcNHqvDvPgTpeFQw-60X_O9-wVy9z5TWZo5iIEfQp4GAVQ/exec",
   sheetsEnabled:  true,
   sheetsTypes:    ["info", "ok", "warn", "error", "pool"],
@@ -320,6 +322,17 @@ let currentSessionId = 0;
 let currentDeviceId  = "";
 let globalPlayIndex  = parseInt(localStorage.getItem("vastGlobalIndex") || "0");
 
+// Счётчики эффективности
+let statsAttempts = 0;  // всего попыток получить рекламу
+let statsSuccess  = 0;  // успешных воспроизведений
+let statsVpaid    = 0;  // пропущено VPAID
+let statsFail     = 0;  // полных провалов (все 3 попытки)
+
+function logStats() {
+  const fillRate = statsAttempts > 0 ? Math.round(statsSuccess / statsAttempts * 100) : 0;
+  log(`📊 Статистика: показов=${statsSuccess} | попыток=${statsAttempts} | fill=${fillRate}% | vpaid_skip=${statsVpaid} | провалов=${statsFail}`, 'info');
+}
+
 function ts() {
   const d = new Date();
   return d.toTimeString().slice(0,8) + '.' + String(d.getMilliseconds()).padStart(3,'0');
@@ -376,6 +389,9 @@ muteBtn.onclick = () => {
   muteBtn.textContent = isMuted ? '🔇' : '🔊';
   muteBtn.classList.toggle('muted', isMuted);
   log(`Звук: ${isMuted ? 'выключен' : 'включён'}`, 'info');
+  // VAST mute/unmute трекеры — SSP отслеживает звуковое поведение
+  pingTracker(isMuted ? currentTrackers?.mute : currentTrackers?.unmute,
+              isMuted ? 'mute' : 'unmute');
 };
 
 /* ============================================================
@@ -406,13 +422,110 @@ function setClickUrl(url) {
 }
 
 clickOverlay.onclick = () => {
-  if (currentClickUrl) openUrl(currentClickUrl);
+  if (currentClickUrl) {
+    pingTracker(currentTrackers?.clickTracking, 'clickTracking');
+    openUrl(currentClickUrl);
+  }
 };
 
 visitBtn.onclick = (e) => {
   e.stopPropagation();
   if (currentClickUrl) openUrl(currentClickUrl);
 };
+
+/* ============================================================
+   VAST TRACKING — Impression + QuartileEvents
+   Без этого SSP не засчитывает показ как валидный
+   ============================================================ */
+let currentTrackers = null;
+
+function extractTrackers(xml) {
+  const trackers = {
+    impression:    [],
+    start:         [],
+    firstQuartile: [],
+    midpoint:      [],
+    thirdQuartile: [],
+    complete:      [],
+    skip:          [],
+    mute:          [],
+    unmute:        [],
+    clickTracking: [],
+    error:         [],
+  };
+
+  try {
+    const doc = new DOMParser().parseFromString(xml, "text/xml");
+
+    // Impression
+    doc.querySelectorAll("Impression").forEach(el => {
+      const u = el.textContent.trim(); if (u.startsWith("http")) trackers.impression.push(u);
+    });
+
+    // TrackingEvents
+    doc.querySelectorAll("Tracking").forEach(el => {
+      const event = el.getAttribute("event");
+      const u = el.textContent.trim();
+      if (event && trackers[event] && u.startsWith("http")) trackers[event].push(u);
+    });
+
+    // ClickTracking
+    doc.querySelectorAll("ClickTracking").forEach(el => {
+      const u = el.textContent.trim(); if (u.startsWith("http")) trackers.clickTracking.push(u);
+    });
+
+    // Error трекеры — пингуем при провале VAST (IAB стандарт)
+    doc.querySelectorAll("Error").forEach(el => {
+      const u = el.textContent.trim(); if (u.startsWith("http")) trackers.error.push(u);
+    });
+  } catch(e) {
+    // Regex fallback для Impression
+    const imp = xml.match(/<Impression[^>]*>(?:<!\[CDATA\[)?(https?:\/\/[^\]<]+)(?:\]\]>)?<\/Impression>/gi);
+    if (imp) imp.forEach(m => {
+      const u = m.replace(/<[^>]+>/g,'').replace(/<!\[CDATA\[|\]\]>/g,'').trim();
+      if (u.startsWith("http")) trackers.impression.push(u);
+    });
+  }
+
+  const total = Object.values(trackers).reduce((s,a) => s + a.length, 0);
+
+  // Парсим версию VAST
+  const vastVer = xml.match(/<VAST[^>]+version="([^"]+)"/)?.[1] || "unknown";
+  log(`VAST v${vastVer} | trackers: imp=${trackers.impression.length} events=${trackers.start.length+trackers.complete.length} error=${trackers.error.length} total=${total}`, 'info');
+  return trackers;
+}
+
+function pingTracker(urls, label) {
+  if (!urls || !urls.length) return;
+  urls.forEach(url => {
+    fetch(url, { method: "GET", mode: "no-cors", keepalive: true,
+      headers: { "User-Agent": MOBILE_UA } })
+      .catch(() => {});
+  });
+  log(`Tracker ping: ${label} (${urls.length})`, 'info');
+}
+
+function setupTrackingEvents(trackers, vid) {
+  if (!trackers) return;
+  let sentStart = false, sentQ1 = false, sentQ2 = false, sentQ3 = false;
+
+  const onTime = () => {
+    const pct = vid.currentTime / (vid.duration || 1);
+    if (!sentStart && pct >= 0.01) { sentStart = true; pingTracker(trackers.start, 'start'); }
+    if (!sentQ1    && pct >= 0.25) { sentQ1    = true; pingTracker(trackers.firstQuartile, '25%'); }
+    if (!sentQ2    && pct >= 0.50) { sentQ2    = true; pingTracker(trackers.midpoint, '50%'); }
+    if (!sentQ3    && pct >= 0.75) { sentQ3    = true; pingTracker(trackers.thirdQuartile, '75%'); }
+  };
+
+  const onEnded = () => {
+    pingTracker(trackers.complete, 'complete');
+    vid.removeEventListener("timeupdate", onTime);
+    vid.removeEventListener("ended", onEnded);
+  };
+
+  vid.addEventListener("timeupdate", onTime);
+  vid.addEventListener("ended", onEnded);
+}
 
 function extractClickThrough(xml) {
   // 1. XML парсер — ищем все варианты тегов
@@ -446,9 +559,118 @@ function loadPool() {
   try { return JSON.parse(localStorage.getItem("vastPool") || "[]"); } catch(e) { return []; }
 }
 function savePool(pool) { localStorage.setItem("vastPool", JSON.stringify(pool)); }
-function generateId() { return "dev_" + Math.random().toString(36).slice(2) + Math.random().toString(36).slice(2); }
+/* ============================================================
+   DEVICE CONTEXT — собираем всё что знаем об устройстве
+   Используется для fingerprint ID и обогащения VAST URL
+   ============================================================ */
+let deviceCtx = null; // заполняется один раз при старте
 
-function getActiveDevice() {
+async function buildDeviceContext() {
+  // Таймзоны РФ — распределение приближено к долям населения
+  const RU_TIMEZONES = [
+    ["Europe/Moscow",       52],  // Москва, ЦФО — самая populous
+    ["Europe/Moscow",       10],  // +дополнительный вес МСК
+    ["Europe/Samara",        5],  // Поволжье
+    ["Asia/Yekaterinburg",   8],  // Урал, Тюмень
+    ["Asia/Omsk",            3],  // Омск
+    ["Asia/Krasnoyarsk",     4],  // Красноярск, Хакасия
+    ["Asia/Irkutsk",         3],  // Иркутск, Бурятия
+    ["Asia/Yakutsk",         2],  // Якутия (часть)
+    ["Asia/Vladivostok",     3],  // Приморье, Хабаровск
+    ["Europe/Kaliningrad",   2],  // Калининград
+  ];
+  // Взвешенный случайный выбор таймзоны
+  function weightedTz() {
+    const raw = Intl.DateTimeFormat().resolvedOptions().timeZone;
+    // Если уже российская — оставляем как есть
+    if (raw.startsWith("Europe/Moscow") || raw.startsWith("Asia/Yekaterinburg") ||
+        raw.startsWith("Asia/Omsk") || raw.startsWith("Asia/Krasnoyarsk") ||
+        raw.startsWith("Asia/Irkutsk") || raw.startsWith("Asia/Yakutsk") ||
+        raw.startsWith("Asia/Vladivostok") || raw.startsWith("Europe/Kaliningrad") ||
+        raw.startsWith("Asia/Magadan") || raw.startsWith("Asia/Sakhalin") ||
+        raw.startsWith("Europe/Samara") || raw.startsWith("Asia/Anadyr")) {
+      return raw;
+    }
+    // Нероссийская — подменяем взвешенно
+    const total = RU_TIMEZONES.reduce((s, [,w]) => s + w, 0);
+    let r = Math.random() * total;
+    for (const [tz, w] of RU_TIMEZONES) { r -= w; if (r <= 0) return tz; }
+    return "Europe/Moscow";
+  }
+
+  // Языки — нормализуем к русскому если нероссийский
+  const RU_LANGS = ["ru-RU", "ru-RU", "ru-RU", "ru", "ru-RU,ru;q=0.9"];
+  function normalizeLang() {
+    const raw = navigator.language || "";
+    if (raw.startsWith("ru")) return raw; // уже русский
+    // Подменяем на ru-RU
+    return "ru-RU";
+  }
+
+  const tz    = weightedTz();
+  const lang  = normalizeLang();
+  const langs = lang.startsWith("ru")
+    ? (navigator.languages || [lang]).filter(l => l.startsWith("ru")).join(",") || "ru-RU,ru;q=0.9"
+    : "ru-RU,ru;q=0.9,en;q=0.8";
+  const sw    = screen.width, sh = screen.height;
+  const dpr   = Math.round((window.devicePixelRatio || 1) * 100) / 100;
+  const cores = navigator.hardwareConcurrency || 4;
+  const mem   = navigator.deviceMemory || 2;
+  const ua    = navigator.userAgent;
+  const conn  = navigator.connection?.effectiveType || "4g";
+  const touch = navigator.maxTouchPoints > 0 ? 1 : 0;
+
+  // Определяем тип ОС из UA
+  const isAndroid = /Android/.test(ua);
+  const isIOS     = /iPhone|iPad/.test(ua);
+  const osName    = isAndroid ? "Android" : isIOS ? "iOS" : "Unknown";
+  const osVer     = (ua.match(/Android ([\d.]+)/) || ua.match(/OS ([\d_]+)/) || ["",""])[1].replace(/_/g,".");
+
+  // Canvas fingerprint — лёгкий, без рендера
+  let canvasFp = "0";
+  try {
+    const c = document.createElement("canvas");
+    c.width = 64; c.height = 16;
+    const ctx2 = c.getContext("2d");
+    ctx2.font = "12px Arial"; ctx2.fillStyle = "#f60";
+    ctx2.fillText("CineGram", 2, 12);
+    canvasFp = c.toDataURL().slice(-20);
+  } catch(e) {}
+
+  return { tz, lang, langs, sw, sh, dpr, cores, mem, conn, touch, osName, osVer, canvasFp };
+}
+
+async function generateId() {
+  if (!deviceCtx) deviceCtx = await buildDeviceContext();
+  try {
+    const fp = [
+      MOBILE_UA,  // используем наш стабильный UA, не navigator.userAgent
+      deviceCtx.lang,
+      deviceCtx.sw + "x" + deviceCtx.sh,
+      screen.colorDepth,
+      deviceCtx.cores,
+      deviceCtx.mem,
+      deviceCtx.tz,
+      deviceCtx.canvasFp,
+      deviceCtx.dpr,
+    ].join("|");
+
+    const buf = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(fp));
+    const hex = Array.from(new Uint8Array(buf)).map(b => b.toString(16).padStart(2,"0")).join("");
+    const id  = "fp_" + hex.slice(0, 32);
+    log(`Device fingerprint: ...${id.slice(-8)} | ${deviceCtx.osName} ${deviceCtx.osVer} | ${deviceCtx.sw}x${deviceCtx.sh} | ${deviceCtx.conn}`, 'pool');
+    return id;
+  } catch(e) {
+    let stored = localStorage.getItem("vastDeviceId");
+    if (!stored) {
+      stored = "rnd_" + Math.random().toString(36).slice(2) + Math.random().toString(36).slice(2);
+      localStorage.setItem("vastDeviceId", stored);
+    }
+    return stored;
+  }
+}
+
+async function getActiveDevice() {
   let pool = loadPool();
   const now = Date.now();
   if (pool.length > CONFIG.poolSize * 2) pool = pool.slice(-CONFIG.poolSize * 2);
@@ -470,7 +692,7 @@ function getActiveDevice() {
       log(`Pool: сброс cooldown для ...${expired.id.slice(-6)}`, 'pool');
       expired.plays = 0; expired.cooldownUntil = 0; device = expired;
     } else {
-      device = { id: generateId(), plays: 0, cooldownUntil: 0 };
+      device = { id: await generateId(), plays: 0, cooldownUntil: 0 };
       pool.push(device);
       if (pool.length > CONFIG.poolSize * 2) pool.shift();
       log(`Pool: новый ID ...${device.id.slice(-6)} (всего: ${pool.length})`, 'pool');
@@ -484,7 +706,7 @@ function getActiveDevice() {
 let forcedDeviceId = null;
 function forceNextDevice() {
   const pool = loadPool();
-  const newDevice = { id: generateId(), plays: 0, cooldownUntil: 0 };
+  const newDevice = { id: await generateId(), plays: 0, cooldownUntil: 0 };
   pool.unshift(newDevice); // добавляем в начало чтобы getActiveDevice взял первым
   if (pool.length > CONFIG.poolSize * 2) pool.pop();
   savePool(pool);
@@ -525,20 +747,109 @@ function bumpGlobalIndex() { globalPlayIndex++; localStorage.setItem("vastGlobal
 /* ============================================================
    VAST
    ============================================================ */
-function buildVastUrl(deviceId, playIndex) {
+async function buildVastUrl(deviceId, playIndex) {
   const groupSize   = 3;
   const deviceGroup = hashCode(deviceId) % groupSize;
   const segment     = Math.floor(playIndex / groupSize);
   const shuffle     = Math.random() > 0.7 ? 1 : 0;
   const cb          = Date.now() + Math.floor(Math.random() * 999999);
-  return `https://ssp.wink.ru/v1/rt/avod/vast?ad_place_type=preroll&age_value=18&broadcast_type=ott&client_id=${deviceId}&domain=t.me&embedded=P5&is_child=false&is_paid=0&location=100001&san=web_vast_code&ad_position=1&content_id=23080&device_type=NCWEB&web_client_type=mobile&segment=${segment}&group=${deviceGroup}&shuffle=${shuffle}&play_index=${playIndex}&cb=${cb}`;
+
+  // Собираем дополнительные сигналы из deviceCtx
+  const ctx   = deviceCtx || {};
+  const sw    = ctx.sw || screen.width;
+  const sh    = ctx.sh || screen.height;
+  const dpr   = ctx.dpr || window.devicePixelRatio || 2;
+  const lang  = encodeURIComponent(ctx.lang || "ru-RU");
+  const tz    = encodeURIComponent(ctx.tz  || "Europe/Moscow");
+  const osName = encodeURIComponent(ctx.osName || "Android");
+  const osVer  = encodeURIComponent(ctx.osVer  || "13");
+
+  // Размер плеера — fullscreen
+  const pw = window.innerWidth  || sw;
+  const ph = window.innerHeight || sh;
+
+  // Живая вариативность — меняется при каждом запросе как у реального пользователя
+  // Тип соединения: реальный если доступен, иначе естественное чередование wifi/4g
+  const connTypes = ["4g", "4g", "4g", "wifi", "wifi", "3g"]; // веса: 4g чаще всего
+  const liveConn = navigator.connection?.effectiveType
+    || connTypes[Math.floor(Math.random() * connTypes.length)];
+
+  // cb с человеческой вариацией — не точный timestamp, а с погрешностью 0.5–4с назад
+  const humanCb = Date.now() - Math.floor(Math.random() * 3500 + 500);
+
+  // Батарея — если API доступен, иначе реалистичный диапазон (30–95%)
+  let batteryLevel = null;
+  try {
+    const bat = await navigator.getBattery?.();
+    if (bat) batteryLevel = Math.round(bat.level * 100);
+  } catch(e) {}
+  const battery = batteryLevel ?? (30 + Math.floor(Math.random() * 65));
+
+  const params = new URLSearchParams({
+    // Базовые параметры SSP
+    ad_place_type:    "preroll",
+    age_value:        "18",
+    broadcast_type:   "ott",
+    client_id:        deviceId,
+    domain:           "t.me",
+    embedded:         "P5",
+    is_child:         "false",
+    is_paid:          "0",
+    location:         "100001",
+    san:              "web_vast_code",
+    ad_position:      "1",
+    content_id:       "23080",
+    device_type:      "MOBILE",        // было NCWEB → повышает ставки
+    web_client_type:  "mobile",
+    segment:          segment,
+    group:            deviceGroup,
+    shuffle:          shuffle,
+    play_index:       playIndex,
+    cb:               humanCb,
+
+    // Размер плеера — важен для Viewability
+    player_width:     pw,
+    player_height:    ph,
+
+    // Устройство
+    screen_width:     sw,
+    screen_height:    sh,
+    dpr:              dpr,
+    os:               osName,
+    os_version:       osVer,
+    connection_type:  liveConn,
+    battery:          battery,
+
+    // Локаль
+    language:         lang,
+    timezone:         tz,
+
+    // IAB signals
+    gdpr:             "0",             // РФ трафик — не под GDPR
+    coppa:            "0",             // не детский контент
+    ua:               encodeURIComponent(MOBILE_UA),
+  });
+
+  return `https://ssp.wink.ru/v1/rt/avod/vast?${params.toString()}`;
 }
+
+// UA реального мобильного Chrome — повышает доверие SSP и ставки
+const MOBILE_UA = "Mozilla/5.0 (Linux; Android 13; Pixel 7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Mobile Safari/537.36";
 
 async function fetchWithTimeout(url, timeoutMs) {
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), timeoutMs);
   try {
-    const res = await fetch(url, { signal: controller.signal });
+    const res = await fetch(url, {
+      signal: controller.signal,
+      headers: {
+        "User-Agent": MOBILE_UA,
+        "Accept": "application/xml, text/xml, */*",
+        "Accept-Language": "ru-RU,ru;q=0.9,en;q=0.8",
+        "Referer": "https://t.me/",
+        "Origin": "https://t.me",
+      }
+    });
     clearTimeout(timer);
     return await res.text();
   } catch(e) { clearTimeout(timer); throw e; }
@@ -573,7 +884,7 @@ function extractMedia(xml) {
       const api  = (m.getAttribute("apiFramework") || "").toUpperCase();
       const type = (m.getAttribute("type") || "").toLowerCase();
       const url  = m.textContent.trim();
-      if (api === "VPAID") { log(`Пропуск VPAID: ${url.slice(0,50)}`, 'warn'); continue; }
+      if (api === "VPAID") { log(`Пропуск VPAID: ${url.slice(0,50)}`, 'warn'); statsVpaid++; continue; }
       if (url.match(/\.(js|swf)(\?|$)/i)) { log(`Пропуск non-video: ${url.slice(0,50)}`, 'warn'); continue; }
       if (url.match(/\.(mp4|webm|m3u8)(\?|$)/i) || type.includes("mp4") || type.includes("webm")) {
         log(`Media URL: ${url.slice(0,70)}...`, 'ok');
@@ -621,14 +932,15 @@ let preloadCache = null; // { mediaUrl, clickUrl, xml }
 
 async function preloadNext() {
   try {
-    const device  = getActiveDevice();
+    const device  = await getActiveDevice();
     const nextIdx = globalPlayIndex + 1;
-    const vastUrl = buildVastUrl(device.id, nextIdx);
+    const vastUrl = await buildVastUrl(device.id, nextIdx);
     const xml     = await resolveVast(vastUrl);
     const mediaUrl = extractMedia(xml);
     const clickUrl = extractClickThrough(xml);
+    const trackers = extractTrackers(xml);
     if (mediaUrl) {
-      preloadCache = { mediaUrl, clickUrl };
+      preloadCache = { mediaUrl, clickUrl, trackers };
       log(`Preload: следующий ролик готов`, 'info');
     }
   } catch(e) {
@@ -654,10 +966,17 @@ async function startAd() {
   video.removeAttribute("src");
   video.load();
 
-  const device    = getActiveDevice();
+  // Человеческая задержка перед запросом (300–1200мс) — антифрод сигнал
+  const humanDelay = 300 + Math.floor(Math.random() * 900);
+  await delay(humanDelay);
+  if (mySession !== currentSession) return;
+
+  const device    = await getActiveDevice();
   currentDeviceId = device.id;
 
   log(`Device: ...${device.id.slice(-6)}, plays=${device.plays}`, 'info');
+
+  statsAttempts++;
 
   for (let attempt = 1; attempt <= CONFIG.maxRetries; attempt++) {
     if (mySession !== currentSession) { log(`Сессия #${mySession} отменена`, 'debug'); return; }
@@ -670,6 +989,7 @@ async function startAd() {
       // Используем предзагруженный VAST если есть
       if (preloadCache) {
         ({ mediaUrl, clickUrl } = preloadCache);
+        currentTrackers = preloadCache.trackers || null;
         preloadCache = null;
         log(`Используем preload-кэш`, 'info');
       } else {
@@ -678,6 +998,7 @@ async function startAd() {
         if (mySession !== currentSession) return;
         mediaUrl = extractMedia(xml);
         clickUrl = extractClickThrough(xml);
+        currentTrackers = extractTrackers(xml);
       }
 
       if (!mediaUrl) {
@@ -687,6 +1008,7 @@ async function startAd() {
       }
 
       log(`Загрузка видео...`, 'info');
+      adStartTime = Date.now();
       video.src   = mediaUrl;
       video.muted = isMuted;
       video.load();
@@ -728,7 +1050,13 @@ async function startAd() {
       startSkipCountdown();
       recordPlay(device.id);
       bumpGlobalIndex();
+      statsSuccess++;
+      // VAST tracking — Impression + quartile events
+      pingTracker(currentTrackers?.impression, 'impression');
+      setupTrackingEvents(currentTrackers, video);
       log(`Ролик запущен ✓ globalIndex → ${globalPlayIndex}`, 'ok');
+      // Выводим статистику каждые 5 успешных показов
+      if (statsSuccess % 5 === 0) logStats();
       // Предзагружаем следующий VAST пока играет текущий
       setTimeout(() => preloadNext(), 2000);
       return;
@@ -742,7 +1070,11 @@ async function startAd() {
   }
 
   if (mySession !== currentSession) return;
+  statsFail++;
   log(`Все попытки провалились → смена device + пауза 3с`, 'error');
+  // Пингуем Error трекер — IAB стандарт, SSP ожидает этот сигнал при провале
+  pingTracker(currentTrackers?.error?.map(u => u.replace("[ERRORCODE]", "900")), 'error:900');
+  logStats();
   // Принудительно переключаем device_id чтобы получить другую рекламу
   forceNextDevice();
   showLoader(false);
@@ -766,9 +1098,18 @@ video.addEventListener("error", () => {
 });
 video.addEventListener("waiting", () => log('Буферизация...', 'debug'));
 video.addEventListener("stalled", () => log('Зависание потока (stalled)', 'warn'));
-video.addEventListener("playing", () => log('Воспроизведение (playing)', 'debug'));
+let adStartTime = 0; // фиксируем когда начали загрузку
+video.addEventListener("playing", () => {
+  const ttff = adStartTime ? Math.round(Date.now() - adStartTime) : 0;
+  log(`Воспроизведение (playing) | TTFF: ${ttff}мс`, ttff > 3000 ? 'warn' : 'ok');
+});
 
-skipBtn.onclick = () => { log('Skip', 'info'); resetSkip(); setClickUrl(null); startAd(); };
+skipBtn.onclick = () => {
+  log('Skip', 'info');
+  pingTracker(currentTrackers?.skip, 'skip');
+  pingTracker(currentTrackers?.clickTracking, 'clickTracking');
+  resetSkip(); setClickUrl(null); startAd();
+};
 
 closeBtn.onclick = () => {
   log('Закрытие плеера', 'info');
@@ -781,8 +1122,23 @@ closeBtn.onclick = () => {
    СТАРТ
    ============================================================ */
 log('Плеер запущен', 'ok');
+// Инициализируем device context заранее — до первого VAST запроса
+buildDeviceContext().then(ctx => { deviceCtx = ctx; log(`OS: ${ctx.osName} ${ctx.osVer} | ${ctx.sw}x${ctx.sh} | net: ${ctx.conn}`, 'info'); });
 log(`Config: adsPerDevice=${CONFIG.adsPerDevice}, cooldown=${CONFIG.cooldownMs/60000}мин, poolSize=${CONFIG.poolSize}`, 'debug');
 log(`Sheets: ${CONFIG.sheetsEnabled ? 'включён ✓' : 'выключен'}`, 'info');
+log(`UA: ${MOBILE_UA.slice(0, 60)}...`, 'info');
+
+// Проверка размера плеера по KPI (≥540×360)
+const pw = window.innerWidth, ph = window.innerHeight;
+const sizeOk = pw >= CONFIG.minPlayerW && ph >= CONFIG.minPlayerH;
+log(`Размер плеера: ${pw}×${ph} px — ${sizeOk ? '✓ OK' : '✗ НИЖЕ KPI'}`, sizeOk ? 'ok' : 'warn');
+
+// Viewability — Intersection Observer
+const observer = new IntersectionObserver(entries => {
+  const ratio = entries[0]?.intersectionRatio ?? 1;
+  if (ratio < 0.5) log(`Viewability: плеер вышел из зоны видимости (${Math.round(ratio*100)}%)`, 'warn');
+}, { threshold: [0, 0.5, 1.0] });
+observer.observe(document.getElementById("playerWrapper"));
 log(`globalPlayIndex: ${globalPlayIndex}`, 'debug');
 
 startAd();
