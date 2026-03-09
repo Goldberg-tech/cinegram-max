@@ -859,7 +859,18 @@ async function resolveVast(url, depth = 0, parentXml = '') {
   if (depth > 5) throw new Error("VAST wrapper depth exceeded");
   log(`VAST fetch [depth=${depth}]: ${url.slice(0,80)}...`, 'vast');
   const xml = await fetchWithTimeout(url, CONFIG.fetchTimeoutMs);
-  log(`VAST ответ: ${xml.length} байт`, 'vast');
+  log(`VAST ответ: ${xml.length} байт | preview: ${xml.slice(0,120).replace(/\s+/g,' ')}`, 'vast');
+
+  // Детектируем No-Fill явно — SSP вернул пустой VAST без <Ad>
+  const hasAd = xml.includes('<Ad ') || xml.includes('<Ad>');
+  if (!hasAd && xml.includes('<VAST')) {
+    log(`VAST No-Fill (пустой ответ без <Ad>) — SSP не дал рекламу`, 'warn');
+    return xml; // возвращаем пустой — extractMedia вернёт null
+  }
+  if (xml.length < 50) {
+    log(`VAST слишком короткий (${xml.length} байт) — возможно ошибка сети`, 'warn');
+  }
+
   const wrapper = xml.match(/<VASTAdTagURI><!\[CDATA\[([\s\S]*?)\]\]>/);
   if (wrapper) {
     log(`VAST wrapper → цепочка`, 'vast');
@@ -1002,7 +1013,10 @@ async function startAd() {
       }
 
       if (!mediaUrl) {
-        log(`Попытка ${attempt}: нет медиа, пауза ${CONFIG.noAdRetryMs}мс`, 'warn');
+        // При no-fill меняем play_index — запрашиваем другой креатив из пула SSP
+        globalPlayIndex = (globalPlayIndex + Math.floor(Math.random() * 7 + 1)) % 10000;
+        localStorage.setItem('vastGlobalIndex', globalPlayIndex);
+        log(`Попытка ${attempt}: нет медиа → новый index=${globalPlayIndex}, пауза ${CONFIG.noAdRetryMs}мс`, 'warn');
         await delay(CONFIG.noAdRetryMs);
         continue;
       }
@@ -1127,21 +1141,37 @@ closeBtn.onclick = () => {
 log('Плеер запущен', 'ok');
 
 // Принудительный поворот в ландшафт при запуске плеера
-// Решает проблему размера < 540px на iPhone/Android в портрете
 (async () => {
   const tgApp = window.Telegram?.WebApp;
+  let locked = false;
+
   try {
-    // Способ 1: стандартный Web API (Android Chrome, некоторые Telegram WebView)
     await screen.orientation.lock("landscape");
     log('Ориентация: landscape locked ✓', 'ok');
-  } catch(e) {
+    locked = true;
+  } catch(e) {}
+
+  if (!locked) {
     try {
-      // Способ 2: Telegram Mini App API (Bot API 7.x+)
       tgApp?.lockOrientation?.();
-      log('Ориентация: tg.lockOrientation ✓', 'ok');
-    } catch(e2) {
-      log('Ориентация: автоповорот недоступен — поверните устройство вручную', 'warn');
-    }
+      await new Promise(r => setTimeout(r, 500));
+      const isLandscape = window.innerWidth > window.innerHeight;
+      log('Ориентация: tg.lockOrientation → ' + (isLandscape ? 'landscape ✓' : 'portrait (iOS игнорирует)'), isLandscape ? 'ok' : 'warn');
+      locked = isLandscape;
+    } catch(e) {}
+  }
+
+  if (!locked && window.innerWidth <= window.innerHeight) {
+    log('Ориентация: iOS блокирует autorotate — показываем подсказку', 'warn');
+    const hint = document.createElement('div');
+    hint.id = 'rotateHint';
+    hint.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,.88);z-index:9999;display:flex;flex-direction:column;align-items:center;justify-content:center;color:#fff;font-size:18px;text-align:center;padding:24px;';
+    hint.innerHTML = '<div style="font-size:52px;margin-bottom:16px">&#128241;&#10145;&#65039;</div><div style="font-weight:600;margin-bottom:8px">Поверните устройство</div><div style="opacity:.7;font-size:15px">для просмотра рекламы</div>';
+    document.body.appendChild(hint);
+    const onOrient = () => {
+      if (window.innerWidth > window.innerHeight) { hint.remove(); window.removeEventListener('resize', onOrient); }
+    };
+    window.addEventListener('resize', onOrient);
   }
 })();
 
