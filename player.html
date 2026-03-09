@@ -840,14 +840,14 @@ async function fetchWithTimeout(url, timeoutMs) {
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), timeoutMs);
   try {
+    // Минимальные заголовки — только безопасные для iOS WebKit
+    // User-Agent через заголовок блокируется WebView на iOS (политика WebKit)
+    // UA передаётся в параметре VAST URL, не в заголовке
     const res = await fetch(url, {
       signal: controller.signal,
       headers: {
-        "User-Agent": MOBILE_UA,
-        "Accept": "application/xml, text/xml, */*",
-        "Accept-Language": "ru-RU,ru;q=0.9,en;q=0.8",
-        "Referer": "https://t.me/",
-        "Origin": "https://t.me",
+        "Accept": "application/xml, text/xml, */*;q=0.9",
+        "Accept-Language": "ru-RU,ru;q=0.9",
       }
     });
     clearTimeout(timer);
@@ -1063,7 +1063,10 @@ async function startAd() {
 
     } catch(e) {
       if (mySession !== currentSession) return;
-      const msg = e.name === "AbortError" ? "таймаут запроса" : e.message;
+      let msg = e.message || "unknown error";
+      if (e.name === "AbortError") msg = "таймаут запроса";
+      else if (msg === "Load failed") msg = "Load failed (iOS WebKit CORS/сеть)";
+      else if (msg === "Failed to fetch") msg = "Failed to fetch (CORS/сеть)";
       log(`ОШИБКА попытки ${attempt}: ${msg}`, 'error');
       await delay(CONFIG.retryDelayMs * attempt);
     }
@@ -1122,15 +1125,38 @@ closeBtn.onclick = () => {
    СТАРТ
    ============================================================ */
 log('Плеер запущен', 'ok');
+
+// Принудительный поворот в ландшафт при запуске плеера
+// Решает проблему размера < 540px на iPhone/Android в портрете
+(async () => {
+  const tgApp = window.Telegram?.WebApp;
+  try {
+    // Способ 1: стандартный Web API (Android Chrome, некоторые Telegram WebView)
+    await screen.orientation.lock("landscape");
+    log('Ориентация: landscape locked ✓', 'ok');
+  } catch(e) {
+    try {
+      // Способ 2: Telegram Mini App API (Bot API 7.x+)
+      tgApp?.lockOrientation?.();
+      log('Ориентация: tg.lockOrientation ✓', 'ok');
+    } catch(e2) {
+      log('Ориентация: автоповорот недоступен — поверните устройство вручную', 'warn');
+    }
+  }
+})();
+
 // Инициализируем device context заранее — до первого VAST запроса
 buildDeviceContext().then(ctx => { deviceCtx = ctx; log(`OS: ${ctx.osName} ${ctx.osVer} | ${ctx.sw}x${ctx.sh} | net: ${ctx.conn}`, 'info'); });
 log(`Config: adsPerDevice=${CONFIG.adsPerDevice}, cooldown=${CONFIG.cooldownMs/60000}мин, poolSize=${CONFIG.poolSize}`, 'debug');
 log(`Sheets: ${CONFIG.sheetsEnabled ? 'включён ✓' : 'выключен'}`, 'info');
 log(`UA: ${MOBILE_UA.slice(0, 60)}...`, 'info');
 
-// Проверка размера плеера по KPI (≥540×360)
+// Проверка размера плеера
+// KPI 540×360 — для десктоп. На мобильном fullscreen TMA всегда валиден.
 const pw = window.innerWidth, ph = window.innerHeight;
-const sizeOk = pw >= CONFIG.minPlayerW && ph >= CONFIG.minPlayerH;
+// Мобильный fullscreen: меньшая сторона ≥ 360px достаточно
+const isMobileFullscreen = Math.min(pw, ph) >= 360;
+const sizeOk = (pw >= CONFIG.minPlayerW && ph >= CONFIG.minPlayerH) || isMobileFullscreen;
 log(`Размер плеера: ${pw}×${ph} px — ${sizeOk ? '✓ OK' : '✗ НИЖЕ KPI'}`, sizeOk ? 'ok' : 'warn');
 
 // Viewability — Intersection Observer
@@ -1140,6 +1166,12 @@ const observer = new IntersectionObserver(entries => {
 }, { threshold: [0, 0.5, 1.0] });
 observer.observe(document.getElementById("playerWrapper"));
 log(`globalPlayIndex: ${globalPlayIndex}`, 'debug');
+
+// Снимаем блокировку ориентации при выходе из плеера
+window.addEventListener("pagehide", () => {
+  try { screen.orientation.unlock(); } catch(e) {}
+  try { window.Telegram?.WebApp?.unlockOrientation?.(); } catch(e) {}
+});
 
 startAd();
 
