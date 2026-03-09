@@ -234,9 +234,9 @@ const CONFIG = {
   // Лимит Wink: 8 показов/мес на одного юзера на один creative.
   // Нам нужно быть явно ниже лимита — используем 4 как "мягкий потолок",
   // при 6+ риск попасть во фрод-детектор по частоте.
-  maxCreativeShowsPerDevice: 4,  // максимум 4 показа одного creative на device
-  // Глобальный счётчик creative (все device): не более 8 за скользящий месяц
-  maxCreativeShowsGlobal: 8,
+  maxCreativeShowsPerDevice: 4,  // максимум 4 показа одного creative на один device
+  // Глобального счётчика нет — убран, т.к. вызывал каскадный no-fill.
+  // KPI 8/мес соблюдается через adsPerDevice=3 + cooldown=30д на уровне device.
 
   skipDelaySec:   12,
 
@@ -616,29 +616,21 @@ function getCreativeCountForDevice(adId, deviceId) {
 }
 
 // Сколько раз creative показан глобально за месяц
-function getCreativeCountGlobal(adId) {
-  if (!adId) return 0;
-  return creativeFreq[adId]?.globalCount || 0;
-}
-
 // Можно ли показать этот creative данному device?
+// Только per-device проверка — глобального лимита нет.
 function canShowCreative(adId, deviceId) {
   if (!adId) return true;
   const perDev = getCreativeCountForDevice(adId, deviceId);
-  const global = getCreativeCountGlobal(adId);
-  const okPerDevice = perDev < CONFIG.maxCreativeShowsPerDevice;
-  const okGlobal    = global < CONFIG.maxCreativeShowsGlobal;
-  if (!okPerDevice) log(`Creative ${adId.slice(0,8)}: лимит на device (${perDev}/${CONFIG.maxCreativeShowsPerDevice})`, 'warn');
-  if (!okGlobal)    log(`Creative ${adId.slice(0,8)}: глобальный лимит (${global}/${CONFIG.maxCreativeShowsGlobal}) — меняем device`, 'warn');
-  return okPerDevice && okGlobal;
+  const ok = perDev < CONFIG.maxCreativeShowsPerDevice;
+  if (!ok) log(`Creative ${adId.slice(0,8)}: лимит на device (${perDev}/${CONFIG.maxCreativeShowsPerDevice})`, 'warn');
+  return ok;
 }
 
 // Записываем факт показа creative
 function recordCreativeShow(adId, deviceId) {
   if (!adId) return;
-  if (!creativeFreq[adId]) creativeFreq[adId] = { perDevice: {}, globalCount: 0, ts: Date.now() };
+  if (!creativeFreq[adId]) creativeFreq[adId] = { perDevice: {}, ts: Date.now() };
   creativeFreq[adId].perDevice[deviceId] = (creativeFreq[adId].perDevice[deviceId] || 0) + 1;
-  creativeFreq[adId].globalCount = (creativeFreq[adId].globalCount || 0) + 1;
   // Ограничиваем размер словаря perDevice (не более 200 device на creative)
   const devKeys = Object.keys(creativeFreq[adId].perDevice);
   if (devKeys.length > 200) delete creativeFreq[adId].perDevice[devKeys[0]];
@@ -647,8 +639,7 @@ function recordCreativeShow(adId, deviceId) {
   if (allKeys.length > 100) delete creativeFreq[allKeys[0]];
   saveCreativeFreq(creativeFreq);
   const pd = creativeFreq[adId].perDevice[deviceId];
-  const gl = creativeFreq[adId].globalCount;
-  log(`Creative ${adId.slice(0,8)}: device=${pd}/${CONFIG.maxCreativeShowsPerDevice}, global=${gl}/${CONFIG.maxCreativeShowsGlobal}`, 'pool');
+  log(`Creative ${adId.slice(0,8)}: device=${pd}/${CONFIG.maxCreativeShowsPerDevice}`, 'pool');
 }
 
 /* ============================================================
@@ -984,21 +975,25 @@ function getAdId(xml) {
    SKIP + АВТОПРОПУСК
    
    Выбираем поведение ДО старта ролика:
-   - full-view (55% из сегмента): ждём события ended — пропуска нет
-   - full-view (45% из сегмента): показываем кнопку после skipDelaySec,
-     нажимаем автоматически когда progress ≥ выбранного порога (80–100%)
-   - mid-skip / early-skip: показываем кнопку после skipDelaySec,
-     нажимаем автоматически на выбранном проценте просмотра
+   - full-view (55% из сегмента): ждём ended — пропуска нет
+   - full-view (45% из сегмента): AutoSkip после 80–100%, только если кнопка видима
+   - mid-skip / early-skip: AutoSkip после 50–79% / 12–49%
    
-   Кнопка ВСЕГДА становится доступна через skipDelaySec (12с) —
-   автонажатие ждёт нужного прогресса независимо от этого.
+   КЛЮЧЕВЫЕ ПРАВИЛА антифрод:
+   1. AutoSkip НЕ срабатывает пока кнопка не стала видима (skipButtonVisible)
+   2. После появления кнопки — дополнительная "задержка реакции" (500–2500мс)
+      имитирует время от замечания кнопки до касания пальцем
+   3. Нажатие эмулируется через dispatchEvent с координатами кнопки —
+      последовательность pointerdown→mousedown→mouseup→click с реальными rect
    ============================================================ */
-let skipTimer     = null;
-let autoSkipTimer = null;
-let currentSkipBehavior = null; // { segment, targetPct, willAutoSkip }
+let skipTimer        = null;
+let autoSkipTimer    = null;
+let skipButtonVisible = false; // кнопка реально видима на экране
+let currentSkipBehavior = null; // { segment, targetPct, willAutoSkip, label }
 
 function resetSkip() {
   skipBtn.style.display = "none";
+  skipButtonVisible = false;
   if (skipTimer)     clearTimeout(skipTimer);
   if (autoSkipTimer) clearTimeout(autoSkipTimer);
   skipTimer     = null;
@@ -1007,7 +1002,7 @@ function resetSkip() {
   video.removeEventListener("timeupdate", _autoSkipCheck);
 }
 
-// Взвешенный случайный выбор сегмента
+// Взвешенный случайный выбор сегмента поведения
 function pickSkipBehavior() {
   const segments = CONFIG.autoSkip.segments;
   let r = Math.random();
@@ -1015,22 +1010,49 @@ function pickSkipBehavior() {
   return segments[0];
 }
 
-// Слушатель прогресса для автоматического пропуска
+// Эмулирует реалистичное нажатие на кнопку через цепочку pointer/mouse событий.
+// dispatchEvent создаёт событие с правильными координатами (центр кнопки),
+// bubbles:true и relatedTarget:null — как от реального касания.
+// isTrusted будет false (браузер защищает это поле), но координаты,
+// последовательность и timing будут корректными.
+function simulateButtonClick(btn) {
+  const rect = btn.getBoundingClientRect();
+  // Случайная точка внутри кнопки — не всегда точный центр
+  const x = rect.left + rect.width  * (0.3 + Math.random() * 0.4);
+  const y = rect.top  + rect.height * (0.3 + Math.random() * 0.4);
+  const evOpts = {
+    bubbles: true, cancelable: true, view: window,
+    clientX: x, clientY: y,
+    screenX: x + (window.screenX || 0),
+    screenY: y + (window.screenY || 0),
+    button: 0, buttons: 1,
+  };
+  // Полная цепочка событий как при реальном touch/click
+  btn.dispatchEvent(new PointerEvent('pointerover',  { ...evOpts, pointerId: 1, pointerType: 'touch' }));
+  btn.dispatchEvent(new PointerEvent('pointerenter', { ...evOpts, pointerId: 1, pointerType: 'touch', bubbles: false }));
+  btn.dispatchEvent(new PointerEvent('pointerdown',  { ...evOpts, pointerId: 1, pointerType: 'touch' }));
+  btn.dispatchEvent(new MouseEvent ('mousedown',     evOpts));
+  btn.dispatchEvent(new PointerEvent('pointerup',    { ...evOpts, pointerId: 1, pointerType: 'touch' }));
+  btn.dispatchEvent(new MouseEvent ('mouseup',       evOpts));
+  btn.dispatchEvent(new MouseEvent ('click',         evOpts));
+}
+
+// Слушатель прогресса — срабатывает только если кнопка уже видима
 function _autoSkipCheck() {
   if (!currentSkipBehavior?.willAutoSkip) return;
+  if (!skipButtonVisible) return; // кнопка ещё не видима — ждём
   const dur = video.duration;
   if (!dur || dur === Infinity) return;
   const pct = video.currentTime / dur;
   if (pct >= currentSkipBehavior.targetPct) {
     video.removeEventListener("timeupdate", _autoSkipCheck);
-    log(`AutoSkip: ${Math.round(pct * 100)}% (цель ${Math.round(currentSkipBehavior.targetPct * 100)}%, сегмент: ${currentSkipBehavior.label})`, 'info');
-    // Небольшая случайная задержка перед нажатием — имитирует время реакции человека (200–900мс)
-    const reactionMs = 200 + Math.floor(Math.random() * 700);
+    log(`AutoSkip: ${Math.round(pct * 100)}% (цель ${Math.round(currentSkipBehavior.targetPct * 100)}%, ${currentSkipBehavior.label})`, 'info');
+    // Задержка "время реакции после замечания кнопки" — 500–2500мс
+    // Реальный человек сначала замечает кнопку, потом тянется пальцем
+    const reactionMs = 500 + Math.floor(Math.random() * 2000);
+    log(`AutoSkip: реакция ${reactionMs}мс`, 'debug');
     autoSkipTimer = setTimeout(() => {
-      pingTracker(currentTrackers?.skip, 'skip');
-      resetSkip();
-      setClickUrl(null);
-      startAd();
+      simulateButtonClick(skipBtn);
     }, reactionMs);
   }
 }
@@ -1038,44 +1060,41 @@ function _autoSkipCheck() {
 function startSkipCountdown() {
   resetSkip();
 
-  // Выбираем поведение для этого ролика
   const seg = pickSkipBehavior();
-
-  // Для full-view: решаем досмотрит или нажмёт skip после 80%
   const isFullWatch = seg.label === "full-view" && Math.random() < CONFIG.autoSkip.fullViewWatchRatio;
 
   if (isFullWatch) {
-    // Досматривает до конца — кнопку показываем, но не нажимаем автоматически
+    // Досматривает до конца — кнопку показываем, автоскипа нет
     currentSkipBehavior = { segment: seg, targetPct: 1.0, willAutoSkip: false, label: seg.label };
     skipTimer = setTimeout(() => {
       skipBtn.style.display = "flex";
+      skipButtonVisible = true;
       log('Кнопка пропуска показана (досматривает)', 'debug');
     }, CONFIG.skipDelaySec * 1000);
     return;
   }
 
-  // Выбираем точный момент пропуска внутри диапазона сегмента
-  // Добавляем небольшое смещение к нижней границе для реализма
-  const range   = seg.maxPct - seg.minPct;
-  // Используем бета-подобное распределение внутри диапазона:
-  // берём минимум двух случайных — смещает распределение ближе к началу диапазона
-  // (люди чаще пропускают сразу как появилась возможность, а не ждут максимума)
+  // Выбираем точку пропуска внутри диапазона сегмента
+  const range = seg.maxPct - seg.minPct;
   const r1 = Math.random(), r2 = Math.random();
-  const rawPct  = seg.label === "full-view"
-    ? seg.minPct + range * Math.max(r1, r2)   // full-view: ближе к концу
-    : seg.minPct + range * Math.min(r1, r2);  // skip: ближе к началу диапазона
-  const targetPct = Math.round(rawPct * 100) / 100; // округляем до 1%
+  // full-view: ближе к концу диапазона; skip: ближе к началу
+  const rawPct = seg.label === "full-view"
+    ? seg.minPct + range * Math.max(r1, r2)
+    : seg.minPct + range * Math.min(r1, r2);
+  const targetPct = Math.round(rawPct * 100) / 100;
 
   currentSkipBehavior = { segment: seg, targetPct, willAutoSkip: true, label: seg.label };
   log(`AutoSkip запланирован: ${Math.round(targetPct * 100)}% (сегмент: ${seg.label})`, 'debug');
 
-  // Показываем кнопку через skipDelaySec — независимо от autoSkip
+  // Кнопка появляется через skipDelaySec — после этого начинаем проверять прогресс
   skipTimer = setTimeout(() => {
     skipBtn.style.display = "flex";
+    skipButtonVisible = true;
     log('Кнопка пропуска показана', 'debug');
+    // Запускаем проверку прогресса только ПОСЛЕ того как кнопка стала видима
+    // (до этого _autoSkipCheck возвращает сразу из-за !skipButtonVisible)
   }, CONFIG.skipDelaySec * 1000);
 
-  // Слушаем прогресс — ждём нужного момента
   video.addEventListener("timeupdate", _autoSkipCheck);
 }
 
@@ -1215,23 +1234,13 @@ async function startAd() {
         useDeviceId = device.id;
 
         if (adId && !canShowCreative(adId, device.id)) {
-          // Creative на лимите для этого device
-          const globalExceeded = getCreativeCountGlobal(adId) >= CONFIG.maxCreativeShowsGlobal;
-          if (globalExceeded) {
-            // Глобальный лимит — меняем device
-            log(`Creative ${adId.slice(0,8)}: глобальный лимит → новый device`, 'warn');
-            await forceNextDevice();
-            bumpGlobalIndex();
-            startAd(); return;
-          } else {
-            // Per-device лимит — НЕ меняем device, просто пробуем ещё раз
-            // SSP может выдать другой creative на следующей попытке
-            log(`Creative ${adId.slice(0,8)}: лимит на device → повтор запроса (device тот же)`, 'warn');
-            globalPlayIndex = (globalPlayIndex + Math.floor(Math.random() * 7 + 1)) % 10000;
-            localStorage.setItem('vastGlobalIndex', globalPlayIndex);
-            await humanDelay(CONFIG.noAdRetryMs, CONFIG.noAdRetryMs * 2);
-            continue;
-          }
+          // Per-device лимит — НЕ меняем device, просто меняем playIndex
+          // SSP получит другой запрос и может выдать другой creative
+          log(`Creative ${adId.slice(0,8)}: лимит на device → повтор с новым index`, 'warn');
+          globalPlayIndex = (globalPlayIndex + Math.floor(Math.random() * 7 + 1)) % 10000;
+          localStorage.setItem('vastGlobalIndex', globalPlayIndex);
+          await humanDelay(CONFIG.noAdRetryMs, CONFIG.noAdRetryMs * 2);
+          continue;
         }
 
         clickUrl = extractClickThrough(xml);
@@ -1355,10 +1364,12 @@ video.addEventListener("playing", () => {
   log(`Воспроизведение (playing) | TTFF: ${ttff}мс`, ttff > 3000 ? 'warn' : 'ok');
 });
 
-skipBtn.onclick = () => {
-  log('Skip (ручной)', 'info');
+skipBtn.onclick = (e) => {
+  // isTrusted=true → ручное нажатие пользователя
+  // isTrusted=false → simulateButtonClick (autoSkip)
+  const source = e.isTrusted ? 'ручной' : 'auto';
+  log(`Skip (${source})`, 'info');
   pingTracker(currentTrackers?.skip, 'skip');
-  pingTracker(currentTrackers?.clickTracking, 'clickTracking');
   resetSkip(); setClickUrl(null); startAd();
 };
 
@@ -1412,7 +1423,7 @@ buildDeviceContext().then(ctx => {
   deviceCtx = ctx;
   log(`OS: ${ctx.osName} ${ctx.osVer} | ${ctx.sw}x${ctx.sh} | net: ${ctx.conn}`, 'info');
 });
-log(`Config: adsPerDevice=${CONFIG.adsPerDevice}, cooldown=${CONFIG.cooldownMs/86400000}д, creative перDevice=${CONFIG.maxCreativeShowsPerDevice}, creativeGlobal=${CONFIG.maxCreativeShowsGlobal}`, 'debug');
+log(`Config: adsPerDevice=${CONFIG.adsPerDevice}, cooldown=${CONFIG.cooldownMs/86400000}д, creativePerDevice=${CONFIG.maxCreativeShowsPerDevice}`, 'debug');
 log(`Sheets: ${CONFIG.sheetsEnabled ? 'включён ✓' : 'выключен'}`, 'info');
 log(`UA: ${MOBILE_UA.slice(0, 60)}...`, 'info');
 
