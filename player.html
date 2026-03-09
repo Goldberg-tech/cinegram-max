@@ -941,6 +941,9 @@ let preloadCache = null; // { mediaUrl, clickUrl, xml }
 
 async function preloadNext() {
   try {
+    // Для preload всегда берём СЛЕДУЮЩИЙ device из pool (не текущий активный)
+    // Иначе кэшируется тот же client_id что только что показал рекламу
+    await forceNextDevice();
     const device  = await getActiveDevice();
     const nextIdx = globalPlayIndex + 1;
     const vastUrl = await buildVastUrl(device.id, nextIdx);
@@ -1063,6 +1066,9 @@ async function startAd() {
       recordPlay(device.id);
       bumpGlobalIndex();
       statsSuccess++;
+      // После каждого показа сбрасываем текущий device — следующий startAd возьмёт другой из pool
+      // Это обеспечивает перемешивание client_id даже если у device ещё есть plays в запасе
+      forcedDeviceId = null; // сбрасываем forced чтобы getActiveDevice выбрал случайный
       // VAST tracking — Impression + quartile events
       pingTracker(currentTrackers?.impression, 'impression');
       setupTrackingEvents(currentTrackers, video);
