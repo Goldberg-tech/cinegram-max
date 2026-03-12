@@ -1,6 +1,6 @@
 window.addEventListener("DOMContentLoaded", () => {
-  if (window.Telegram?.WebApp) {
-    const tg = window.Telegram.WebApp;
+const tg = window.MaxBridge || window.Telegram?.WebApp;
+  if (tg) {
     tg.ready();
     try {
       tg.expand();
